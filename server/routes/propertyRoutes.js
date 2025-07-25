@@ -1,126 +1,86 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const PropertyService = require('../services/propertyService.js');
 const { requireUser } = require('./middleware/auth.js');
 
-// Get current user's property listings - MUST be before /:id route
-router.get('/my-listings', requireUser, async (req, res) => {
-  try {
-    console.log(`[PROPERTY] GET /api/properties/my-listings - Fetching listings for user ${req.user.id}`);
+// --- Multer Configuration ---
+// Ensure the 'uploads' directory exists
+const uploadDir = 'uploads/';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-    const properties = await PropertyService.getByOwner(req.user.id);
-
-    console.log(`[PROPERTY] Retrieved ${properties.length} listings for user ${req.user.id}`);
-
-    res.json({
-      success: true,
-      properties
-    });
-  } catch (error) {
-    console.error('[PROPERTY] Error fetching user listings:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+// Set up storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-// Get all properties with optional filters and search
-router.get('/', async (req, res) => {
-  try {
-    console.log('[PROPERTY] GET /api/properties - Fetching properties');
-    console.log('[PROPERTY] Query params:', JSON.stringify(req.query, null, 2));
+const upload = multer({ storage: storage });
 
-    const filters = {
-      search: req.query.search,
-      location: req.query.location,
-      propertyType: req.query.propertyType ? (Array.isArray(req.query.propertyType) ? req.query.propertyType : [req.query.propertyType]) : undefined,
-      priceMin: req.query.priceMin ? parseFloat(req.query.priceMin) : undefined,
-      priceMax: req.query.priceMax ? parseFloat(req.query.priceMax) : undefined,
-      bedrooms: req.query.bedrooms ? parseInt(req.query.bedrooms) : undefined,
-      bathrooms: req.query.bathrooms ? parseInt(req.query.bathrooms) : undefined,
-      availability: req.query.availability,
-      sortBy: req.query.sortBy || 'newest',
-      page: req.query.page ? parseInt(req.query.page) : 1,
-      limit: req.query.limit ? parseInt(req.query.limit) : 12
+
+// Create a new property
+router.post('/', requireUser, upload.array('images', 10), async (req, res) => {
+  try {
+    const propertyData = {
+      ...req.body,
+      images: req.files ? req.files.map(file => file.path) : []
     };
 
-    // Remove undefined values
-    Object.keys(filters).forEach(key => {
-      if (filters[key] === undefined || filters[key] === '') {
-        delete filters[key];
-      }
-    });
-
-    const result = await PropertyService.list(filters);
-
-    console.log(`[PROPERTY] Retrieved ${result.properties.length} properties`);
-
-    res.json({
-      success: true,
-      ...result
-    });
-  } catch (error) {
-    console.error('[PROPERTY] Error fetching properties:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Get single property by ID - MUST be after /my-listings route
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`[PROPERTY] GET /api/properties/${id} - Fetching property`);
-
-    const property = await PropertyService.get(id);
-
-    if (!property) {
-      console.log(`[PROPERTY] Property not found: ${id}`);
-      return res.status(404).json({
-        success: false,
-        error: 'Property not found'
-      });
-    }
-
-    console.log(`[PROPERTY] Property retrieved: ${property.title}`);
-
-    res.json({
-      success: true,
-      property
-    });
-  } catch (error) {
-    console.error('[PROPERTY] Error fetching property:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Create new property listing
-router.post('/', requireUser, async (req, res) => {
-  try {
-    console.log(`[PROPERTY] POST /api/properties - Creating property for user ${req.user.id}`);
-    console.log('[PROPERTY] Property data:', JSON.stringify(req.body, null, 2));
-
-    const property = await PropertyService.create(req.body, req.user.id);
-
-    console.log(`[PROPERTY] Property created: ${property.title}`);
+    const newProperty = await PropertyService.create(propertyData, req.user.id);
 
     res.status(201).json({
       success: true,
-      property,
-      message: 'Property listing created successfully and is pending verification'
+      message: 'Property created successfully',
+      data: newProperty
     });
   } catch (error) {
-    console.error('[PROPERTY] Error creating property:', error.message);
+    console.error('[PROPERTY ROUTE] Error creating property:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Failed to create property'
     });
+  }
+});
+
+// Get current user's property listings
+router.get('/my-listings', requireUser, async (req, res) => {
+  try {
+    const properties = await PropertyService.getByOwner(req.user.id);
+    res.json({ success: true, properties });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all properties
+router.get('/', async (req, res) => {
+  try {
+    const result = await PropertyService.list(req.query);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single property by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const property = await PropertyService.get(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, error: 'Property not found' });
+    }
+    res.json({ success: true, property });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

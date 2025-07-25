@@ -4,13 +4,19 @@ import JSONbig from 'json-bigint';
 
 
 const localApi = axios.create({
-  headers: {
-    'Content-Type': 'application/json',
-  },
   validateStatus: (status) => {
     return status >= 200 && status < 300;
   },
-  transformResponse: [(data) => JSONbig.parse(data)]
+  transformResponse: [(data) => {
+    try {
+      if (typeof data === 'string') {
+        return JSONbig.parse(data);
+      }
+      return data;
+    } catch (e) {
+      return data; // Keep original data if parsing fails
+    }
+  }]
 });
 
 

@@ -52,8 +52,8 @@ export const getProfile = async () => {
   try {
     console.log('[API] Fetching user profile');
     const response = await api.get('/auth/profile');
-    console.log('[API] Get profile response:', response);
-    return response;
+    console.log('[API] Get profile response:', response.data);
+    return response.data;
   } catch (error) {
     console.error('[API] Get profile failed:', error);
     throw error;

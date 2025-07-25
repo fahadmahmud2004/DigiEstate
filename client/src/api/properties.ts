@@ -1,7 +1,9 @@
 import api from './api';
 
+// The Property and PropertyFilters interfaces can remain the same.
 export interface Property {
   _id: string;
+  listingType: 'Sale' | 'Rent';
   title: string;
   description: string;
   type: 'Flat' | 'Office Apartment' | 'Land' | 'Garage' | 'Godown' | 'Plot';
@@ -60,14 +62,10 @@ export interface PropertyFilters {
   limit?: number;
 }
 
-// Description: Get a list of properties with optional filters
-// Endpoint: GET /api/properties
-// Request: { filters?: PropertyFilters }
-// Response: { properties: Property[], total: number, page: number, totalPages: number }
+
 export const getProperties = async (filters?: PropertyFilters) => {
   try {
     const params = new URLSearchParams();
-    
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -79,7 +77,6 @@ export const getProperties = async (filters?: PropertyFilters) => {
         }
       });
     }
-
     const response = await api.get(`/api/properties?${params.toString()}`);
     return response.data;
   } catch (error: any) {
@@ -87,10 +84,6 @@ export const getProperties = async (filters?: PropertyFilters) => {
   }
 };
 
-// Description: Get a single property by ID
-// Endpoint: GET /api/properties/:id
-// Request: { id: string }
-// Response: { property: Property }
 export const getPropertyById = async (id: string) => {
   try {
     const response = await api.get(`/api/properties/${id}`);
@@ -100,23 +93,23 @@ export const getPropertyById = async (id: string) => {
   }
 };
 
-// Description: Create a new property listing
-// Endpoint: POST /api/properties
-// Request: { property: Omit<Property, '_id' | 'owner' | 'status' | 'views' | 'inquiries' | 'bookings' | 'createdAt' | 'updatedAt'> }
-// Response: { success: boolean, property: Property, message: string }
-export const createProperty = async (propertyData: any) => {
+/**
+ * REWRITTEN: Create a new property listing using FormData for file uploads.
+ * @param {FormData} formData - The complete form data including text fields and image files.
+ * @returns The server response.
+ */
+export const createProperty = async (formData: FormData) => {
   try {
-    const response = await api.post('/api/properties', propertyData);
+    // When sending FormData, the browser automatically sets the correct
+    // 'multipart/form-data' header. We do not set it manually here.
+    const response = await api.post('/api/properties', formData);
     return response.data;
   } catch (error: any) {
-    throw new Error(error?.response?.data?.error || error.message);
+    console.error("API error creating property:", error.response?.data);
+    throw new Error(error?.response?.data?.error || 'Failed to create property listing.');
   }
 };
 
-// Description: Get user's own property listings
-// Endpoint: GET /api/properties/my-listings
-// Request: {}
-// Response: { properties: Property[] }
 export const getMyListings = async () => {
   try {
     const response = await api.get('/api/properties/my-listings');
