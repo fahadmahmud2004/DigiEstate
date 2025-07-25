@@ -4,29 +4,30 @@ const BookingService = require('../services/bookingService.js');
 const { requireUser } = require('./middleware/auth.js');
 
 // Create new booking
+// The 'requireUser' middleware handles token verification for us.
 router.post('/', requireUser, async (req, res) => {
   try {
-    console.log(`[BOOKING] POST /api/bookings - Creating booking for user ${req.user.id}`);
+    const buyerId = req.user.id; // Get the logged-in user's ID from the middleware
+    const bookingData = req.body; // Contains propertyId, preferredDate, etc.
 
-    const bookingData = {
-      ...req.body,
-      userId: req.user.id
-    };
+    console.log(`[BOOKING] POST /api/bookings - Creating booking for user ${buyerId}`);
 
-    const booking = await BookingService.create(bookingData);
+    // Pass the request body and the buyer's ID to the service
+    const newBooking = await BookingService.create(bookingData, buyerId);
 
-    console.log(`[BOOKING] Booking created successfully with ID: ${booking.id}`);
+    console.log(`[BOOKING] Booking created successfully with ID: ${newBooking.id}`);
 
     res.status(201).json({
       success: true,
-      booking,
-      message: 'Booking created successfully'
+      booking: newBooking,
+      message: 'Booking request sent successfully'
     });
   } catch (error) {
     console.error('[BOOKING] Error creating booking:', error.message);
+    // Avoid sending detailed database errors to the client
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'An unexpected error occurred while creating the booking.'
     });
   }
 });

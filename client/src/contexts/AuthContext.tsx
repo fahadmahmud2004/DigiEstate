@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { login as apiLogin, register as apiRegister, logout as apiLogout } from '@/api/auth'
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getProfile } from '@/api/auth'
 
 interface User {
   id: string
@@ -44,13 +44,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      console.log('[AuthContext] Initial auth state: AUTHENTICATED')
-      setIsAuthenticated(true)
-    } else {
-      console.log('[AuthContext] Initial auth state: NOT_AUTHENTICATED')
+    const checkAuthStatus = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (token) {
+        try {
+          console.log('[AuthContext] Token found, fetching profile...')
+          const response = await getProfile() as any
+          if (response.success && response.data) {
+            setUser(response.data)
+            setIsAuthenticated(true)
+            console.log('[AuthContext] Profile fetched, user authenticated')
+          } else {
+            console.log('[AuthContext] Profile fetch failed, logging out')
+            logout()
+          }
+        } catch (error) {
+          console.error('[AuthContext] Error fetching profile:', error)
+          logout()
+        }
+      } else {
+        console.log('[AuthContext] No token found, user not authenticated')
+        setIsAuthenticated(false)
+      }
     }
+    checkAuthStatus()
   }, [])
 
   const login = async (email: string, password: string) => {

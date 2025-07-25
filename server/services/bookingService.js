@@ -1,297 +1,236 @@
 const { randomUUID } = require('crypto');
 const { getDB } = require('../config/database.js');
-const UserService = require('./userService.js');
+
+/**
+ * A helper function to consistently format booking data from the database
+ * into the nested object structure the frontend expects.
+ * @param {object} row - A raw row object from a database query result.
+ * @returns {object} A formatted booking object.
+ */
+const _formatBooking = (row) => {
+  if (!row) return null;
+
+  const buyerName = row.buyer_name || (row.buyer_email ? row.buyer_email.split('@')[0] : 'N/A');
+  const sellerName = row.seller_name || (row.seller_email ? row.seller_email.split('@')[0] : 'N/A');
+
+  return {
+    id: row.id,
+    status: row.status,
+    message: row.message,
+    preferredDate: row.preferred_date,
+    preferredTime: row.preferred_time,
+    declineReason: row.decline_reason,
+    referenceNumber: row.reference_number,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    property: {
+      id: row.property_id,
+      title: row.property_title,
+      location: row.property_location,
+      price: parseFloat(row.property_price),
+      images: row.property_images || [],
+    },
+    buyer: {
+      id: row.buyer_id,
+      name: buyerName,
+      email: row.buyer_email,
+      avatar: row.buyer_avatar,
+    },
+    seller: {
+      id: row.seller_id,
+      name: sellerName,
+      email: row.seller_email,
+      avatar: row.seller_avatar,
+    },
+  };
+};
+
 
 class BookingService {
-  static async create(bookingData, userId) {
+  static async create(bookingData, buyerId) {
     try {
-      console.log(`[BookingService] Creating booking for user ${userId} and property ${bookingData.propertyId}`);
+      console.log(`[BookingService] Attempting to create booking for user ${buyerId}`);
       const db = getDB();
 
-      // Get property details from properties table
-      const propertyQuery = `
-        SELECT * FROM properties WHERE id = $1
-      `;
+      const propertyQuery = 'SELECT owner_id FROM properties WHERE id = $1';
       const propertyResult = await db.query(propertyQuery, [bookingData.propertyId]);
-      const property = propertyResult.rows[0];
-      if (!property) {
-        throw new Error('Property not found');
-      }
+      
+      if (propertyResult.rows.length === 0) throw new Error('Property not found.');
+      const sellerId = propertyResult.rows[0].owner_id;
 
-      // Get buyer details
-      const buyer = await UserService.get(userId);
-      if (!buyer) {
-        throw new Error('Buyer not found');
-      }
+      const referenceNumber = `REF-${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-      // Get seller details (owner is owner_id in properties)
-      const seller = await UserService.get(property.owner_id);
-      if (!seller) {
-        throw new Error('Property owner not found');
-      }
-
-      // Generate reference number
-      const referenceNumber = 'REF' + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
-
-      // Insert booking into bookings table
       const insertQuery = `
-        INSERT INTO bookings (id, user_id, property_id, status, booking_date, message, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, NOW(), $5, NOW(), NOW())
-        RETURNING *
+        INSERT INTO bookings (
+          id, property_id, buyer_id, seller_id, preferred_date,
+          preferred_time, message, reference_number, status, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Pending', NOW(), NOW())
+        RETURNING id;
       `;
-      const bookingId = randomUUID();
-      const bookingResult = await db.query(insertQuery, [
-        bookingId,
-        userId,
-        bookingData.propertyId,
-        'Pending',
-        bookingData.message || ''
-      ]);
-      const newBooking = bookingResult.rows[0];
+      const newBookingId = randomUUID();
+      const values = [
+        newBookingId, bookingData.propertyId, buyerId, sellerId,
+        bookingData.preferredDate, bookingData.preferredTime,
+        bookingData.message || '', referenceNumber,
+      ];
+      
+      const result = await db.query(insertQuery, values);
+      const createdBookingId = result.rows[0].id;
 
-      // Construct full booking object with details for return
-      return {
-        _id: newBooking.id,
-        property: {
-          _id: property.id,
-          title: property.title,
-          location: property.location,
-          price: parseFloat(property.price),
-          images: typeof property.images === 'string' ? JSON.parse(property.images) : (property.images || [])
-        },
-        buyer: {
-          _id: buyer.id,
-          name: buyer.name || buyer.email.split('@')[0],
-          email: buyer.email,
-          phone: buyer.phone || ''
-        },
-        seller: {
-          _id: seller.id,
-          name: seller.name || seller.email.split('@')[0],
-          email: seller.email,
-          phone: seller.phone || ''
-        },
-        propertyId: bookingData.propertyId,
-        buyerId: userId,
-        sellerId: property.owner_id,
-        preferredDate: bookingData.preferredDate || null,
-        preferredTime: bookingData.preferredTime || null,
-        message: bookingData.message || null,
-        status: newBooking.status,
-        referenceNumber,
-        createdAt: newBooking.created_at,
-        updatedAt: newBooking.updated_at,
-      };
+      console.log(`[BookingService] Successfully created booking with ID: ${createdBookingId}`);
+      return this.get(createdBookingId);
+
     } catch (err) {
-      console.error(`[BookingService] Error creating booking: ${err.message}`);
-      throw new Error(`Database error while creating booking: ${err.message}`);
+      console.error('[BookingService] Error in create:', err);
+      throw new Error('Failed to create booking due to a database error.');
+    }
+  }
+
+  static async get(bookingId) {
+    try {
+      const db = getDB();
+      const query = `
+        SELECT
+          b.*,
+          p.id AS property_id, p.title AS property_title, p.location AS property_location, p.price AS property_price, p.images AS property_images,
+          buyer.id AS buyer_id, buyer.name AS buyer_name, buyer.email AS buyer_email, buyer.avatar AS buyer_avatar,
+          seller.id AS seller_id, seller.name AS seller_name, seller.email AS seller_email, seller.avatar AS seller_avatar
+        FROM bookings AS b
+        JOIN properties AS p ON b.property_id = p.id
+        JOIN users AS buyer ON b.buyer_id = buyer.id
+        JOIN users AS seller ON b.seller_id = seller.id
+        WHERE b.id = $1;
+      `;
+      const result = await db.query(query, [bookingId]);
+      return _formatBooking(result.rows[0]);
+    } catch (err) {
+      console.error(`[BookingService] Error in get for ID ${bookingId}:`, err);
+      throw new Error('Failed to retrieve booking details.');
     }
   }
 
   static async getByUserId(userId) {
     try {
-      console.log(`[BookingService] Fetching bookings for user ${userId}`);
       const db = getDB();
-
       const query = `
-        SELECT b.*, p.title, p.location, p.price, p.images,
-               u_seller.id as seller_id, u_seller.name as seller_name, u_seller.email as seller_email, u_seller.phone as seller_phone, u_seller.avatar as seller_avatar
-        FROM bookings b
-        JOIN properties p ON b.property_id = p.id
-        JOIN users u_seller ON p.owner_id = u_seller.id
-        WHERE b.user_id = $1
-        ORDER BY b.created_at DESC
+        SELECT
+          b.*,
+          p.id AS property_id, p.title AS property_title, p.location AS property_location, p.price AS property_price, p.images AS property_images,
+          buyer.id AS buyer_id, buyer.name AS buyer_name, buyer.email AS buyer_email, buyer.avatar AS buyer_avatar,
+          seller.id AS seller_id, seller.name AS seller_name, seller.email AS seller_email, seller.avatar AS seller_avatar
+        FROM bookings AS b
+        JOIN properties AS p ON b.property_id = p.id
+        JOIN users AS buyer ON b.buyer_id = buyer.id
+        JOIN users AS seller ON b.seller_id = seller.id
+        WHERE b.buyer_id = $1 OR b.seller_id = $1
+        ORDER BY b.created_at DESC;
       `;
       const result = await db.query(query, [userId]);
+      return result.rows.map(_formatBooking);
+    } catch (err) {
+      console.error(`[BookingService] Error in getByUserId for user ${userId}:`, err);
+      throw new Error("Failed to retrieve user's bookings.");
+    }
+  }
+
+  /**
+   * Updates the status of a booking (e.g., 'Accepted', 'Declined').
+   * Only the property owner (seller) can perform this action.
+   * @param {string} bookingId - The ID of the booking to update.
+   * @param {'Accepted' | 'Declined'} status - The new status.
+   * @param {string} userId - The ID of the user performing the action (must be the seller).
+   * @param {string} [declineReason] - An optional reason if the booking is declined.
+   * @returns {Promise<object>} The updated and formatted booking object.
+   */
+  static async updateStatus(bookingId, status, userId, declineReason = null) {
+    try {
+      const db = getDB();
       
-      return result.rows.map(row => ({
-        _id: row.id,
-        property: {
-          _id: row.property_id,
-          title: row.title,
-          location: row.location,
-          price: parseFloat(row.price),
-          images: typeof row.images === 'string' ? JSON.parse(row.images) : (row.images || [])
-        },
-        buyer: {
-          _id: userId,
-          name: '', // Will be filled by the calling function
-          email: '',
-          phone: ''
-        },
-        seller: {
-          _id: row.seller_id,
-          name: row.seller_name || row.seller_email.split('@')[0],
-          email: row.seller_email,
-          phone: row.seller_phone || '',
-          avatar: row.seller_avatar
-        },
-        preferredDate: row.booking_date,
-        preferredTime: '',
-        message: row.message || '',
-        status: row.status,
-        referenceNumber: `REF${row.id.substring(0, 8).toUpperCase()}`,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
-    } catch (err) {
-      console.error(`[BookingService] Error fetching user bookings: ${err.message}`);
-      throw new Error(`Database error while fetching user bookings: ${err.message}`);
-    }
-  }
+      // Authorization: Check if the user is the seller of this booking.
+      const authQuery = 'SELECT seller_id FROM bookings WHERE id = $1';
+      const authResult = await db.query(authQuery, [bookingId]);
+      if (authResult.rows.length === 0) throw new Error('Booking not found.');
+      if (authResult.rows[0].seller_id !== userId) throw new Error('User not authorized to update this booking.');
 
-  static async get(id) {
-    try {
-      console.log(`[BookingService] Fetching booking with ID: ${id}`);
-      const db = getDB();
-
-      const query = `
-        SELECT b.*, p.title, p.location, p.price, p.images,
-               u_buyer.name as buyer_name, u_buyer.email as buyer_email, u_buyer.phone as buyer_phone,
-               u_seller.id as seller_id, u_seller.name as seller_name, u_seller.email as seller_email, u_seller.phone as seller_phone
-        FROM bookings b
-        JOIN properties p ON b.property_id = p.id
-        JOIN users u_buyer ON b.user_id = u_buyer.id
-        JOIN users u_seller ON p.owner_id = u_seller.id
-        WHERE b.id = $1
-      `;
-      const result = await db.query(query, [id]);
-      const row = result.rows[0];
-      if (!row) {
-        return null;
-      }
-
-      return {
-        _id: row.id,
-        property: {
-          _id: row.property_id,
-          title: row.title,
-          location: row.location,
-          price: parseFloat(row.price),
-          images: typeof row.images === 'string' ? JSON.parse(row.images) : (row.images || [])
-        },
-        buyer: {
-          _id: row.user_id,
-          name: row.buyer_name || row.buyer_email.split('@')[0],
-          email: row.buyer_email,
-          phone: row.buyer_phone || ''
-        },
-        seller: {
-          _id: row.seller_id,
-          name: row.seller_name || row.seller_email.split('@')[0],
-          email: row.seller_email,
-          phone: row.seller_phone || ''
-        },
-        status: row.status,
-        message: row.message,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      };
-    } catch (err) {
-      console.error(`[BookingService] Error fetching booking: ${err.message}`);
-      throw new Error(`Database error while fetching booking: ${err.message}`);
-    }
-  }
-
-  static async updateStatus(id, status, declineReason, userId) {
-    try {
-      console.log(`[BookingService] Updating booking ${id} status to ${status} by user ${userId}`);
-      const db = getDB();
-
-      // Check if user authorized (buyer or seller)
-      const checkAuthQuery = `
-        SELECT b.id, p.owner_id AS seller_id
-        FROM bookings b
-        JOIN properties p ON b.property_id = p.id
-        WHERE b.id = $1 AND (b.user_id = $2 OR p.owner_id = $2)
-      `;
-      const authResult = await db.query(checkAuthQuery, [id, userId]);
-      if (authResult.rowCount === 0) {
-        throw new Error('Not authorized to update this booking');
-      }
-
-      // Update status
       const updateQuery = `
         UPDATE bookings
-        SET status = $1, updated_at = NOW()
-        WHERE id = $2
-        RETURNING *
+        SET 
+          status = $1,
+          decline_reason = CASE WHEN $1 = 'Declined' THEN $2 ELSE decline_reason END,
+          updated_at = NOW()
+        WHERE id = $3
+        RETURNING id;
       `;
-      const updateResult = await db.query(updateQuery, [status, id]);
+      await db.query(updateQuery, [status, declineReason, bookingId]);
 
-      return updateResult.rows[0];
+      console.log(`[BookingService] Updated status for booking ${bookingId} to ${status}`);
+      return this.get(bookingId);
+
     } catch (err) {
-      console.error(`[BookingService] Error updating booking status: ${err.message}`);
-      throw new Error(`Database error while updating booking status: ${err.message}`);
+      console.error(`[BookingService] Error updating status for booking ${bookingId}:`, err);
+      throw new Error('Failed to update booking status.');
     }
   }
 
-  static async cancel(id, userId) {
+  /**
+   * Cancels a booking. Only the user who made the booking (buyer) can cancel it.
+   * @param {string} bookingId - The ID of the booking to cancel.
+   * @param {string} userId - The ID of the user performing the action (must be the buyer).
+   * @returns {Promise<object>} The updated (cancelled) and formatted booking object.
+   */
+  static async cancel(bookingId, userId) {
     try {
-      console.log(`[BookingService] Cancelling booking ${id} by user ${userId}`);
       const db = getDB();
 
-      // Check if booking exists and belongs to user
-      const bookingQuery = `
-        SELECT status, user_id
-        FROM bookings
-        WHERE id = $1
-      `;
-      const bookingResult = await db.query(bookingQuery, [id]);
-      const booking = bookingResult.rows[0];
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-      if (booking.user_id !== userId) {
-        throw new Error('Only the buyer can cancel this booking');
-      }
-      if (booking.status === 'Completed' || booking.status === 'Cancelled') {
-        throw new Error('Cannot cancel a completed or already cancelled booking');
+      // Authorization: Check if the user is the buyer of this booking.
+      const authQuery = 'SELECT buyer_id, status FROM bookings WHERE id = $1';
+      const authResult = await db.query(authQuery, [bookingId]);
+      if (authResult.rows.length === 0) throw new Error('Booking not found.');
+      if (authResult.rows[0].buyer_id !== userId) throw new Error('Only the buyer can cancel this booking.');
+      if (['Completed', 'Cancelled'].includes(authResult.rows[0].status)) {
+        throw new Error('This booking cannot be cancelled as it is already completed or cancelled.');
       }
 
-      // Update status to Cancelled
       const updateQuery = `
-        UPDATE bookings
-        SET status = 'Cancelled', updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
+        UPDATE bookings SET status = 'Cancelled', updated_at = NOW() WHERE id = $1 RETURNING id;
       `;
-      const updateResult = await db.query(updateQuery, [id]);
+      await db.query(updateQuery, [bookingId]);
+      
+      console.log(`[BookingService] Cancelled booking ${bookingId} by user ${userId}`);
+      return this.get(bookingId);
 
-      return updateResult.rows[0];
     } catch (err) {
-      console.error(`[BookingService] Error cancelling booking: ${err.message}`);
-      throw new Error(`Database error while cancelling booking: ${err.message}`);
+      console.error(`[BookingService] Error cancelling booking ${bookingId}:`, err);
+      throw new Error('Failed to cancel booking.');
     }
   }
 
-  static async delete(id, userId) {
+  /**
+   * Deletes a booking. Only the buyer can delete their own bookings.
+   * @param {string} bookingId - The ID of the booking to delete.
+   * @param {string} userId - The ID of the user performing the action (must be the buyer).
+   * @returns {Promise<{success: boolean}>} A success object.
+   */
+  static async delete(bookingId, userId) {
     try {
-      console.log(`[BookingService] Deleting booking ${id} by user ${userId}`);
       const db = getDB();
 
-      // Check ownership
-      const checkQuery = `
-        SELECT user_id FROM bookings WHERE id = $1
-      `;
-      const checkResult = await db.query(checkQuery, [id]);
-      if (checkResult.rowCount === 0) {
-        throw new Error('Booking not found');
-      }
-      if (checkResult.rows[0].user_id !== userId) {
-        throw new Error('Only the buyer can delete this booking');
+      // The DELETE query includes the user ID check for an atomic and secure operation.
+      const deleteQuery = 'DELETE FROM bookings WHERE id = $1 AND buyer_id = $2';
+      const result = await db.query(deleteQuery, [bookingId, userId]);
+
+      // If rowCount is 0, it means either the booking didn't exist or the user wasn't the owner.
+      if (result.rowCount === 0) {
+        throw new Error('Booking not found or user not authorized to delete.');
       }
 
-      // Delete booking
-      const deleteQuery = `
-        DELETE FROM bookings WHERE id = $1
-      `;
-      await db.query(deleteQuery, [id]);
+      console.log(`[BookingService] Deleted booking ${bookingId} by user ${userId}`);
+      return { success: true };
 
-      return true;
     } catch (err) {
-      console.error(`[BookingService] Error deleting booking: ${err.message}`);
-      throw new Error(`Database error while deleting booking: ${err.message}`);
+      console.error(`[BookingService] Error deleting booking ${bookingId}:`, err);
+      throw new Error('Failed to delete booking.');
     }
   }
 }

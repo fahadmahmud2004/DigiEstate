@@ -2,9 +2,12 @@
 require("dotenv").config();
 
 console.log('DATABASE_URL:', process.env.DATABASE_URL);  // <-- Add this line here
+console.log('JWT_SECRET:', process.env.JWT_SECRET);
 
 const express = require('express');
 const cors = require('cors');
+const dotenv = require('dotenv');
+
 const { connectDB } = require('./config/database.js');
 
 // Import routes

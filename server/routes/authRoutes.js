@@ -211,7 +211,7 @@ router.post('/logout', requireUser, async (req, res) => {
 });
 
 // Get current user
-router.get('/me', requireUser, async (req, res) => {
+router.get('/profile', requireUser, async (req, res) => {
   try {
     console.log(`[AUTH] Get current user: ${req.user.id}`);
 
@@ -225,7 +225,7 @@ router.get('/me', requireUser, async (req, res) => {
 
     res.json({
       success: true,
-      user: {
+      data: {
         id: user.id,
         email: user.email,
         name: user.name || '',

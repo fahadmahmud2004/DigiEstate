@@ -11,7 +11,7 @@ class PropertyService {
         SELECT p.*, u.name as owner_name, u.email as owner_email, u.phone as owner_phone, u.avatar as owner_avatar
         FROM properties p
         LEFT JOIN users u ON p.owner_id = u.id
-        WHERE p.status = 'active'
+        WHERE p.status = 'Active'
       `;
 
       const queryParams = [];
@@ -111,7 +111,7 @@ class PropertyService {
       let countQuery = `
         SELECT COUNT(*) as total
         FROM properties p
-        WHERE p.status = 'active'
+        WHERE p.status = 'Active'
       `;
 
       const countParams = [];
@@ -235,68 +235,60 @@ static async create(propertyData, ownerId) {
     const nearbyFacilitiesJSON = JSON.stringify(propertyData.nearbyFacilities || []);
     const featuresJSON = JSON.stringify(propertyData.features || {});
 
-    console.log(`[ListingService] Creating listing for owner: ${ownerId}`);
-    console.log('[ListingService] Listing data:', JSON.stringify(propertyData, null, 2));
+    console.log(`[PropertyService] Creating property for owner: ${ownerId}`);
+    console.log('[PropertyService] Property data:', JSON.stringify(propertyData, null, 2));
 
     const query = `
-      INSERT INTO "Listing" (
-        listing_type, title, description, price,
-        availability_status, location, features, nearby_facilities,
-        images, videos, bedrooms, bathrooms, floor_number,
-        total_floors, area, road_width, is_corner_plot, parking_spaces,
-        is_furnished, has_ac, has_lift, has_parking,
-        custom_features, owner_id, status,
-        views, inquiries, bookings, created_at, updated_at
+      INSERT INTO properties (
+        id, type, title, description, price,
+        location, availability, images, videos, owner_id, status,
+        bedrooms, bathrooms, area, is_furnished, has_parking,
+        created_at, updated_at, views, inquiries, bookings,
+        nearby_facilities, custom_features, floor_number, total_floors,
+        road_width, is_corner_plot, parking_spaces, has_ac, has_lift
       ) VALUES (
-        $1, $2, $3, $4,
-        $5, $6, $7::jsonb, $8::jsonb,
-        $9::jsonb, $10::jsonb, $11, $12, $13,
-        $14, $15, $16, $17, $18,
-        $19, $20, $21, $22,
-        $23::jsonb, $24, $25,
-        $26, $27, $28, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+        NOW(), NOW(), 0, 0, 0,
+        $17::jsonb, $18, $19, $20, $21, $22, $23, $24, $25
       ) RETURNING *
     `;
 
     const values = [
-      propertyData.type || null,
+      randomUUID(),
+      propertyData.type,
       propertyData.title,
       propertyData.description,
       propertyData.price,
-      propertyData.availability || 'available',
       propertyData.location,
-      featuresJSON,
-      nearbyFacilitiesJSON,
-      formattedImages,
-      formattedVideos,
-      propertyData.features?.bedrooms || null,
-      propertyData.features?.bathrooms || null,
-      propertyData.features?.floorNumber || null,
-      propertyData.features?.totalFloors || null,
-      propertyData.features?.area || null,
-      propertyData.features?.roadWidth || null,
-      propertyData.features?.isCornerPlot || false,
-      propertyData.features?.parkingSpaces || 0,
-      propertyData.features?.isFurnished || false,
-      propertyData.features?.hasAC || false,
-      propertyData.features?.hasLift || false,
-      propertyData.features?.hasParking || false,
-      formattedCustomFeatures,
+      propertyData.availability || 'Available',
+      propertyData.images || [],
+      propertyData.videos || [],
       ownerId,
-      'available',
-      0, // views
-      0, // inquiries
-      0  // bookings
+      'Pending Verification',
+      propertyData.features?.bedrooms,
+      propertyData.features?.bathrooms,
+      propertyData.features?.area,
+      propertyData.features?.isFurnished,
+      propertyData.features?.hasParking,
+      JSON.stringify(propertyData.nearbyFacilities || []),
+      propertyData.features?.customFeatures || [],
+      propertyData.features?.floorNumber,
+      propertyData.features?.totalFloors,
+      propertyData.features?.roadWidth,
+      propertyData.features?.isCornerPlot,
+      propertyData.features?.parkingSpaces,
+      propertyData.features?.hasAC,
+      propertyData.features?.hasLift
     ];
 
     const result = await db.query(query, values);
-    const newListing = result.rows[0];
+    const newProperty = result.rows[0];
 
-    console.log(`[ListingService] Listing created with ID: ${newListing.listing_id}`);
-    return newListing;
+    console.log(`[PropertyService] Property created with ID: ${newProperty.id}`);
+    return newProperty;
   } catch (err) {
-    console.error('[ListingService] Error creating listing:', err.message);
-    throw new Error(`Database error while creating listing: ${err.message}`);
+    console.error('[PropertyService] Error creating property:', err.message);
+    throw new Error(`Database error while creating property: ${err.message}`);
   }
 }
 

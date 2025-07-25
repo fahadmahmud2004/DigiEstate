@@ -17,7 +17,7 @@ const connectDB = async () => {
     console.log('Connected to PostgreSQL database');
 
     // Create tables if they don't exist
-    await createTables();
+    // await createTables();
     await createAdminUser();
 
   } catch (error) {

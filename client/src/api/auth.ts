@@ -47,3 +47,15 @@ export const logout = async () => {
     throw new Error(error?.response?.data?.error || error.message);
   }
 };
+
+export const getProfile = async () => {
+  try {
+    console.log('[API] Fetching user profile');
+    const response = await api.get('/auth/profile');
+    console.log('[API] Get profile response:', response);
+    return response;
+  } catch (error) {
+    console.error('[API] Get profile failed:', error);
+    throw error;
+  }
+};
