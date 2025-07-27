@@ -53,10 +53,18 @@ export interface PropertyFilters {
   location?: string;
   priceMin?: number;
   priceMax?: number;
-  propertyType?: string[];
+  propertyType?: string;
   bedrooms?: number;
   bathrooms?: number;
   amenities?: string[];
+  // Property type-specific filters
+  area?: number;
+  roadWidth?: number;
+  floorNumber?: number;
+  totalFloors?: number;
+  parkingSpaces?: number;
+  isCornerPlot?: boolean;
+  isFurnished?: boolean;
   sortBy?: 'price_asc' | 'price_desc' | 'newest' | 'popular';
   page?: number;
   limit?: number;

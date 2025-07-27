@@ -4,6 +4,7 @@ import JSONbig from 'json-bigint';
 
 
 const localApi = axios.create({
+  baseURL: 'http://localhost:3001',
   validateStatus: (status) => {
     return status >= 200 && status < 300;
   },

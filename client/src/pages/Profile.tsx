@@ -24,6 +24,7 @@ export function Profile() {
     phone: "",
     avatar: ""
   })
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [reviews, setReviews] = useState<ReviewsResponse>({ reviews: [], averageRating: 0, totalReviews: 0 })
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' })
@@ -80,13 +81,21 @@ export function Profile() {
 
     setLoading(true)
     try {
-      const response = await updateUserProfile(editData)
+      const formData = new FormData()
+      formData.append('name', editData.name)
+      formData.append('phone', editData.phone)
+      if (avatarFile) {
+        formData.append('avatar', avatarFile)
+      }
+
+      const response = await updateUserProfile(formData)
       setProfileData(response.user)
       toast({
         title: "Success",
         description: response.message || "Profile updated successfully!",
       })
       setIsEditing(false)
+      setAvatarFile(null)
     } catch (error: any) {
       console.error('Profile update error:', error)
       toast({
@@ -96,6 +105,13 @@ export function Profile() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setAvatarFile(e.target.files[0])
+      setEditData(prev => ({ ...prev, avatar: URL.createObjectURL(e.target.files[0]) }))
     }
   }
 
@@ -276,18 +292,30 @@ export function Profile() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profileData.avatar} />
+                    <AvatarImage src={isEditing ? editData.avatar : profileData.avatar} />
                     <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-2xl">
                       {profileData.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   {isEditing && (
-                    <Button
-                      size="icon"
-                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <input
+                        type="file"
+                        id="avatar-upload"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                      />
+                      <label htmlFor="avatar-upload">
+                        <Button
+                          as="span"
+                          size="icon"
+                          className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
+                      </label>
+                    </>
                   )}
                 </div>
                 <div>

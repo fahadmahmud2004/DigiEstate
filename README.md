@@ -20,7 +20,7 @@ The codebase is structured as follows:
 - ExpressJS server implementing REST API endpoints
 - MongoDB with Mongoose for database operations
 - Token-based authentication with JWT
-- Port: 3000
+- Port: 3001
 
 Concurrently is configured to run both the client and server together.
 
@@ -81,7 +81,7 @@ Follow these steps to get the DigiHomeHub project up and running:
 3. Configure the environment variables:
     Create a `.env` file in the `server/` directory with the following content:
     ```sh
-    PORT=3000
+    PORT=3001
     MONGODB_URI=your_mongodb_connection_string
     JWT_SECRET=your_jwt_secret_key
     ```
@@ -91,7 +91,7 @@ Follow these steps to get the DigiHomeHub project up and running:
     npm run start
     ```
 
-5. Access the frontend at `http://localhost:5173` and the backend API endpoints at `http://localhost:3000`.
+5. Access the frontend at `http://localhost:5173` and the backend API endpoints at `http://localhost:3001`.
 
 ### License
 

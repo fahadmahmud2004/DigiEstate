@@ -41,7 +41,7 @@ class UserService {
         [
           userData.email,
           hashedPassword,
-          userData.name || '',
+          userData.name || userData.email.split('@')[0],
           userData.phone || '',
           userData.avatar || '',
           userData.role || 'user',

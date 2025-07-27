@@ -21,6 +21,7 @@ const notificationRoutes = require('./routes/notificationRoutes.js');
 const complaintRoutes = require('./routes/complaintRoutes.js');
 const adminRoutes = require('./routes/adminRoutes.js');
 const seedRoutes = require('./routes/seedRoutes.js');
+const profileRoutes = require('./routes/profileRoutes.js');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,6 +45,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/seed', seedRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

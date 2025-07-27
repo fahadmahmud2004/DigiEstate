@@ -4,8 +4,9 @@ const { randomUUID } = require('crypto');
 class PropertyService {
   static formatProperty(row) {
     if (!row) return null;
+    console.log('Raw row data:', row); // Debugging line
     const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
-    return {
+    const formatted = {
       _id: row.id,
       listingType: row.listing_type,
       title: row.title,
@@ -47,6 +48,8 @@ class PropertyService {
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+    console.log('Formatted property:', formatted); // Debugging line
+    return formatted;
   }
 
   static async list(filters = {}) {
@@ -65,16 +68,91 @@ class PropertyService {
         queryParams.push(value);
         paramIndex++;
       };
-      if (filters.search) addFilter(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}))`, `%${filters.search}%`);
-      if (filters.listingType) addFilter(`p.listing_type = $${paramIndex}`, filters.listingType);
+      
+      // Text search
+      if (filters.search) {
+        addFilter(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}) OR LOWER(p.location) LIKE LOWER($${paramIndex}))`, `%${filters.search}%`);
+      }
+      
+      // Listing type (rent/sale)
+      if (filters.type) {
+        addFilter(`p.listing_type = $${paramIndex}`, filters.type === 'rent' ? 'Rent' : 'Sale');
+      }
+      
+      // Price range
+      if (filters.priceMin) {
+        addFilter(`p.price >= $${paramIndex}`, filters.priceMin);
+      }
+      if (filters.priceMax) {
+        addFilter(`p.price <= $${paramIndex}`, filters.priceMax);
+      }
+      
+      // Property type (single selection)
+      if (filters.propertyType) {
+        addFilter(`p.type = $${paramIndex}`, filters.propertyType);
+      }
+      
+      // Bedrooms (minimum count)
+      if (filters.bedrooms) {
+        addFilter(`p.bedrooms >= $${paramIndex}`, filters.bedrooms);
+      }
+      
+      // Bathrooms (minimum count)
+      if (filters.bathrooms) {
+        addFilter(`p.bathrooms >= $${paramIndex}`, filters.bathrooms);
+      }
+      
+      // Amenities
+      if (filters.amenities && filters.amenities.length > 0) {
+        if (filters.amenities.includes('AC')) {
+          query += ` AND p.has_ac = true`;
+        }
+        if (filters.amenities.includes('Lift')) {
+          query += ` AND p.has_lift = true`;
+        }
+        if (filters.amenities.includes('Parking')) {
+          query += ` AND p.has_parking = true`;
+        }
+      }
+      
+      // Property type-specific filters
+      if (filters.area) {
+        addFilter(`p.area >= $${paramIndex}`, filters.area);
+      }
+      
+      if (filters.roadWidth) {
+        addFilter(`p.road_width >= $${paramIndex}`, filters.roadWidth);
+      }
+      
+      if (filters.floorNumber) {
+        addFilter(`p.floor_number >= $${paramIndex}`, filters.floorNumber);
+      }
+      
+      if (filters.totalFloors) {
+        addFilter(`p.total_floors >= $${paramIndex}`, filters.totalFloors);
+      }
+      
+      if (filters.parkingSpaces) {
+        addFilter(`p.parking_spaces >= $${paramIndex}`, filters.parkingSpaces);
+      }
+      
+      if (filters.isCornerPlot !== undefined) {
+        addFilter(`p.is_corner_plot = $${paramIndex}`, filters.isCornerPlot);
+      }
+      
+      if (filters.isFurnished !== undefined) {
+        addFilter(`p.is_furnished = $${paramIndex}`, filters.isFurnished);
+      }
       
       const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
       const countResult = await db.query(countQuery, queryParams);
       const total = parseInt(countResult.rows[0].count, 10);
 
+      // Sorting
       switch (filters.sortBy) {
         case 'price_asc': query += ' ORDER BY p.price ASC'; break;
         case 'price_desc': query += ' ORDER BY p.price DESC'; break;
+        case 'popular': query += ' ORDER BY p.views DESC, p.bookings DESC'; break;
         default: query += ' ORDER BY p.created_at DESC'; break;
       }
 
@@ -131,11 +209,11 @@ class PropertyService {
           id, owner_id, status, title, description, type, price, location, availability,
           images, bedrooms, bathrooms, floor_number, total_floors, area, road_width,
           is_corner_plot, parking_spaces, is_furnished, has_ac, has_lift, has_parking,
-          custom_features, nearby_facilities, created_at, updated_at
+          custom_features, nearby_facilities, listing_type, created_at, updated_at
         ) VALUES (
           $1, $2, 'Pending Verification', $3, $4, $5, $6, $7, $8, 
           $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 
-          $22, $23, NOW(), NOW()
+          $22, $23, $24, NOW(), NOW()
         ) RETURNING *;
       `;
       
@@ -162,7 +240,8 @@ class PropertyService {
         features.hasLift || false,              // has_lift
         features.hasParking || false,           // has_parking
         customFeatures,                         // custom_features (text[])
-        nearbyFacilitiesJson                    // nearby_facilities (jsonb)
+        nearbyFacilitiesJson,                   // nearby_facilities (jsonb)
+        propertyData.listingType                // listing_type
       ];
 
       const result = await db.query(query, values);

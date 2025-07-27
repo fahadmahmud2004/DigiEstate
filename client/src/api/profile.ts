@@ -22,7 +22,7 @@ export interface UserProfile {
 // Response: { success: boolean, user: UserProfile }
 export const getUserProfile = async () => {
   try {
-    const response = await api.get('/api/users/profile');
+    const response = await api.get('/api/profile');
     return response.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.error || error.message);
@@ -33,13 +33,13 @@ export const getUserProfile = async () => {
 // Endpoint: PUT /api/users/profile
 // Request: { name?: string, phone?: string, avatar?: string }
 // Response: { success: boolean, user: UserProfile, message: string }
-export const updateUserProfile = async (profileData: {
-  name?: string;
-  phone?: string;
-  avatar?: string;
-}) => {
+export const updateUserProfile = async (formData: FormData) => {
   try {
-    const response = await api.put('/api/users/profile', profileData);
+    const response = await api.put('/api/profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.error || error.message);

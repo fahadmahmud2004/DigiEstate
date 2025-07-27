@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { getProperties, Property, PropertyFilters } from "@/api/properties"
 import { useToast } from "@/hooks/useToast"
+import { Label } from "@/components/ui/label"
 
 export function Properties() {
   const [properties, setProperties] = useState<Property[]>([])
@@ -75,7 +76,7 @@ export function Properties() {
   }
 
   const propertyTypes = ['Flat', 'Office Apartment', 'Land', 'Garage', 'Godown', 'Plot']
-  const amenities = ['AC', 'Lift', 'Parking', 'Gym', 'Swimming Pool', 'Security']
+  const amenities = ['AC', 'Lift', 'Parking']
 
   const loadMore = () => {
     setFilters(prev => ({ ...prev, page: (prev.page || 1) + 1 }))
@@ -117,7 +118,7 @@ export function Properties() {
 
         <Select onValueChange={(value) => handleFilterChange('type', value)}>
           <SelectTrigger className="w-48 bg-card-translucent border-gray-200 dark:border-gray-700">
-            <SelectValue placeholder="Property Type" />
+            <SelectValue placeholder="Listing Type" />
           </SelectTrigger>
           <SelectContent className="bg-card-solid border-gray-200 dark:border-gray-700">
             <SelectItem value="rent">For Rent</SelectItem>
@@ -152,7 +153,7 @@ export function Properties() {
               </SheetDescription>
             </SheetHeader>
 
-            <div className="space-y-6 mt-6">
+            <div className="space-y-6 mt-6 pb-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
               {/* Price Range */}
               <div>
                 <h3 className="font-medium mb-3 text-readable">Price Range</h3>
@@ -176,34 +177,28 @@ export function Properties() {
               {/* Property Types */}
               <div>
                 <h3 className="font-medium mb-3 text-readable">Property Type</h3>
-                <div className="space-y-2">
-                  {propertyTypes.map((type) => (
-                    <div key={type} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={type}
-                        onCheckedChange={(checked) => {
-                          const currentTypes = filters.propertyType || []
-                          if (checked) {
-                            handleFilterChange('propertyType', [...currentTypes, type])
-                          } else {
-                            handleFilterChange('propertyType', currentTypes.filter(t => t !== type))
-                          }
-                        }}
-                      />
-                      <label htmlFor={type} className="text-sm text-readable">{type}</label>
-                    </div>
-                  ))}
-                </div>
+                <Select onValueChange={(value) => handleFilterChange('propertyType', value === 'any' ? undefined : value)}>
+                  <SelectTrigger className="bg-card-solid border-gray-200 dark:border-gray-700">
+                    <SelectValue placeholder="Any Property Type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card-solid border-gray-200 dark:border-gray-700">
+                    <SelectItem value="any">Any Property Type</SelectItem>
+                    {propertyTypes.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Bedrooms */}
               <div>
                 <h3 className="font-medium mb-3 text-readable">Bedrooms</h3>
-                <Select onValueChange={(value) => handleFilterChange('bedrooms', parseInt(value))}>
+                <Select onValueChange={(value) => handleFilterChange('bedrooms', value === 'any' ? undefined : parseInt(value))}>
                   <SelectTrigger className="bg-card-solid border-gray-200 dark:border-gray-700">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent className="bg-card-solid border-gray-200 dark:border-gray-700">
+                    <SelectItem value="any">Any</SelectItem>
                     <SelectItem value="1">1+</SelectItem>
                     <SelectItem value="2">2+</SelectItem>
                     <SelectItem value="3">3+</SelectItem>
@@ -215,11 +210,12 @@ export function Properties() {
               {/* Bathrooms */}
               <div>
                 <h3 className="font-medium mb-3 text-readable">Bathrooms</h3>
-                <Select onValueChange={(value) => handleFilterChange('bathrooms', parseInt(value))}>
+                <Select onValueChange={(value) => handleFilterChange('bathrooms', value === 'any' ? undefined : parseInt(value))}>
                   <SelectTrigger className="bg-card-solid border-gray-200 dark:border-gray-700">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent className="bg-card-solid border-gray-200 dark:border-gray-700">
+                    <SelectItem value="any">Any</SelectItem>
                     <SelectItem value="1">1+</SelectItem>
                     <SelectItem value="2">2+</SelectItem>
                     <SelectItem value="3">3+</SelectItem>
@@ -248,6 +244,89 @@ export function Properties() {
                       <label htmlFor={amenity} className="text-sm text-readable">{amenity}</label>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Property Type-Specific Filters */}
+              <div>
+                <h3 className="font-medium mb-3 text-readable">Property Details</h3>
+                <div className="space-y-4">
+                  {/* Area */}
+                  <div>
+                    <Label htmlFor="area">Minimum Area (sq ft)</Label>
+                    <Input
+                      id="area"
+                      type="number"
+                      placeholder="e.g., 1000"
+                      onChange={(e) => handleFilterChange('area', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                  </div>
+
+                  {/* Road Width */}
+                  <div>
+                    <Label htmlFor="roadWidth">Minimum Road Width (ft)</Label>
+                    <Input
+                      id="roadWidth"
+                      type="number"
+                      placeholder="e.g., 20"
+                      onChange={(e) => handleFilterChange('roadWidth', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                  </div>
+
+                  {/* Floor Number */}
+                  <div>
+                    <Label htmlFor="floorNumber">Minimum Floor Number</Label>
+                    <Input
+                      id="floorNumber"
+                      type="number"
+                      placeholder="e.g., 2"
+                      onChange={(e) => handleFilterChange('floorNumber', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                  </div>
+
+                  {/* Total Floors */}
+                  <div>
+                    <Label htmlFor="totalFloors">Minimum Total Floors</Label>
+                    <Input
+                      id="totalFloors"
+                      type="number"
+                      placeholder="e.g., 5"
+                      onChange={(e) => handleFilterChange('totalFloors', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                  </div>
+
+                  {/* Parking Spaces */}
+                  <div>
+                    <Label htmlFor="parkingSpaces">Minimum Parking Spaces</Label>
+                    <Input
+                      id="parkingSpaces"
+                      type="number"
+                      placeholder="e.g., 2"
+                      onChange={(e) => handleFilterChange('parkingSpaces', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                  </div>
+
+                  {/* Corner Plot */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="isCornerPlot"
+                      onCheckedChange={(checked) => {
+                        handleFilterChange('isCornerPlot', checked)
+                      }}
+                    />
+                    <label htmlFor="isCornerPlot" className="text-sm text-readable">Corner Plot</label>
+                  </div>
+
+                  {/* Furnished */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="isFurnished"
+                      onCheckedChange={(checked) => {
+                        handleFilterChange('isFurnished', checked)
+                      }}
+                    />
+                    <label htmlFor="isFurnished" className="text-sm text-readable">Furnished</label>
+                  </div>
                 </div>
               </div>
             </div>
