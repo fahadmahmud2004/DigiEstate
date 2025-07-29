@@ -39,7 +39,7 @@ export interface Property {
     avatar?: string;
     reputation: number;
   };
-  status: 'Pending Verification' | 'Active' | 'Flagged';
+  status: 'Pending Verification' | 'Active' | 'Flagged' | 'Rejected';
   views: number;
   inquiries: number;
   bookings: number;

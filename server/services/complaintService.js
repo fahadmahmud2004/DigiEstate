@@ -79,6 +79,21 @@ class ComplaintService {
         throw new Error('Invalid complaint status');
       }
       
+      // First get the complaint with complainant info
+      const complaintResult = await db.query(`
+        SELECT c.*, u.name as complainant_name, u.email as complainant_email
+        FROM complaints c
+        LEFT JOIN users u ON c.complainant = u.id::text
+        WHERE c.id = $1
+      `, [complaintId]);
+      
+      if (complaintResult.rows.length === 0) {
+        throw new Error('Complaint not found');
+      }
+      
+      const complaint = complaintResult.rows[0];
+      
+      // Update the complaint
       const result = await db.query(
         `UPDATE complaints 
          SET status = $1, resolution = $2, admin_notes = $3, updated_at = NOW() 
@@ -86,11 +101,51 @@ class ComplaintService {
         [status, resolution, adminNotes, complaintId]
       );
       
-      if (result.rows.length === 0) {
-        throw new Error('Complaint not found');
+      // Send notification to the complainant
+      let notificationTitle, notificationMessage;
+      
+      switch (status) {
+        case 'resolved':
+          notificationTitle = 'Complaint Resolved';
+          notificationMessage = resolution 
+            ? `Your complaint has been resolved. Resolution: ${resolution}`
+            : 'Your complaint has been resolved.';
+          break;
+        case 'dismissed':
+          notificationTitle = 'Complaint Dismissed';
+          notificationMessage = adminNotes 
+            ? `Your complaint has been dismissed. Admin notes: ${adminNotes}`
+            : 'Your complaint has been dismissed.';
+          break;
+        case 'in-progress':
+          notificationTitle = 'Complaint Under Review';
+          notificationMessage = 'Your complaint is now under review by our team.';
+          break;
+        default:
+          notificationTitle = 'Complaint Status Updated';
+          notificationMessage = `Your complaint status has been updated to ${status}.`;
       }
       
-      console.log(`[ComplaintService] Complaint ${complaintId} status updated to: ${status}`);
+      await db.query(
+        `INSERT INTO notifications (user_id, type, title, message, data, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [
+          complaint.complainant,
+          'admin',
+          notificationTitle,
+          notificationMessage,
+          JSON.stringify({
+            complaintId: complaint.id,
+            oldStatus: complaint.status,
+            newStatus: status,
+            action: 'complaint_status_change',
+            resolution: resolution || null,
+            adminNotes: adminNotes || null
+          })
+        ]
+      );
+      
+      console.log(`[ComplaintService] Complaint ${complaintId} status updated to: ${status} with notification`);
       return result.rows[0];
     } catch (err) {
       console.error(`[ComplaintService] Error updating complaint status: ${err.message}`);

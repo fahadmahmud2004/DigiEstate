@@ -45,14 +45,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const token = localStorage.getItem('accessToken')
-      if (token) {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
         try {
           console.log('[AuthContext] Token found, fetching profile...')
           const response = await getProfile() as any
           if (response.success && response.data) {
             setUser(response.data)
-            setIsAuthenticated(true)
+      setIsAuthenticated(true)
             console.log('[AuthContext] Profile fetched, user authenticated')
           } else {
             console.log('[AuthContext] Profile fetch failed, logging out')
@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.error('[AuthContext] Error fetching profile:', error)
           logout()
         }
-      } else {
+    } else {
         console.log('[AuthContext] No token found, user not authenticated')
         setIsAuthenticated(false)
       }

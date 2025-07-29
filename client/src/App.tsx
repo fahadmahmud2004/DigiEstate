@@ -18,6 +18,8 @@ import { Notifications } from "./pages/Notifications"
 import { NotificationPreferences } from "./pages/NotificationPreferences"
 import { AdminSeed } from "./pages/AdminSeed"
 import { AdminDashboard } from "./pages/AdminDashboard"
+import { AdminProperties } from "./pages/AdminProperties"
+import { AdminPropertyDetails } from "./pages/AdminPropertyDetails"
 import { BlankPage } from "./pages/BlankPage"
 
 function App() {
@@ -41,6 +43,8 @@ function App() {
               <Route path="notification-preferences" element={<NotificationPreferences />} />
               <Route path="admin/seed" element={<AdminSeed />} />
               <Route path="admin/dashboard" element={<AdminDashboard />} />
+              <Route path="admin/properties" element={<AdminProperties />} />
+              <Route path="admin/properties/:id" element={<AdminPropertyDetails />} />
             </Route>
             <Route path="*" element={<BlankPage />} />
           </Routes>

@@ -4,7 +4,7 @@ import {
   MapPin, Star, Bed, Bath, Square, Car, Wind,
   Building, Phone, Mail, MessageCircle, Calendar,
   ArrowLeft, Heart, Share, Flag, ChevronLeft, ChevronRight,
-  Edit, Trash2
+  Edit, Trash2, X, ZoomIn
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,6 +40,8 @@ export function PropertyDetails() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [editingReview, setEditingReview] = useState<Review | null>(null)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [modalImageIndex, setModalImageIndex] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -217,6 +219,55 @@ export function PropertyDetails() {
     }
   }
 
+  const openImageModal = (index: number) => {
+    setModalImageIndex(index)
+    setImageModalOpen(true)
+  }
+
+  const closeImageModal = () => {
+    setImageModalOpen(false)
+  }
+
+  // Keyboard navigation for modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!imageModalOpen) return;
+      
+      switch (e.key) {
+        case 'Escape':
+          closeImageModal();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          prevModalImage();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          nextModalImage();
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [imageModalOpen]);
+
+  const nextModalImage = () => {
+    if (property) {
+      setModalImageIndex((prev) => 
+        prev === property.images.length - 1 ? 0 : prev + 1
+      )
+    }
+  }
+
+  const prevModalImage = () => {
+    if (property) {
+      setModalImageIndex((prev) => 
+        prev === 0 ? property.images.length - 1 : prev - 1
+      )
+    }
+  }
+
   const renderStars = (rating: number, interactive = false, onRatingChange?: (rating: number) => void) => {
     return (
       <div className="flex items-center gap-1">
@@ -280,18 +331,29 @@ export function PropertyDetails() {
       </div>
 
       {/* Image Gallery */}
-      <div className="relative h-96 rounded-lg overflow-hidden bg-gray-100">
+      <div className="relative h-96 rounded-lg overflow-hidden bg-gray-100 cursor-pointer group">
         <img
           src={property.images[currentImageIndex] || '/placeholder-property.jpg'}
           alt={property.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onClick={() => openImageModal(currentImageIndex)}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = '/placeholder-property.jpg';
+          }}
         />
+        
+        {/* Zoom indicator */}
+        <div className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <ZoomIn className="h-4 w-4" />
+        </div>
+        
         {property.images.length > 1 && (
           <>
             <Button
               variant="outline"
               size="icon"
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm"
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm hover:bg-white"
               onClick={prevImage}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -299,7 +361,7 @@ export function PropertyDetails() {
             <Button
               variant="outline"
               size="icon"
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm"
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm hover:bg-white"
               onClick={nextImage}
             >
               <ChevronRight className="h-4 w-4" />
@@ -308,7 +370,7 @@ export function PropertyDetails() {
               {property.images.map((_, index) => (
                 <button
                   key={index}
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-2 h-2 rounded-full transition-colors duration-200 ${
                     index === currentImageIndex ? 'bg-white' : 'bg-white/50'
                   }`}
                   onClick={() => setCurrentImageIndex(index)}
@@ -693,6 +755,90 @@ export function PropertyDetails() {
           </Card>
         </div>
       </div>
+
+      {/* Image Modal */}
+      <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
+        <DialogContent className="max-w-[40vw] max-h-[40vh] p-0 bg-black/95 border-0">
+          <div className="relative w-full h-full">
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70"
+              onClick={closeImageModal}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+
+            {/* Main image */}
+            <div className="relative w-full h-full flex items-center justify-center p-2">
+              <img
+                src={property.images[modalImageIndex] || '/placeholder-property.jpg'}
+                alt={`${property.title} - Image ${modalImageIndex + 1}`}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/placeholder-property.jpg';
+                }}
+              />
+            </div>
+
+            {/* Navigation buttons */}
+            {property.images.length > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-white/20"
+                  onClick={prevModalImage}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-white/20"
+                  onClick={nextModalImage}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
+              </>
+            )}
+
+            {/* Image counter */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full">
+              {modalImageIndex + 1} of {property.images.length}
+            </div>
+
+            {/* Thumbnail strip */}
+            {property.images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 p-2 rounded-lg max-w-[80vw] overflow-x-auto">
+                {property.images.map((image, index) => (
+                  <button
+                    key={index}
+                    className={`w-16 h-12 rounded overflow-hidden border-2 transition-all duration-200 flex-shrink-0 ${
+                      index === modalImageIndex 
+                        ? 'border-white scale-110' 
+                        : 'border-transparent hover:border-white/50'
+                    }`}
+                    onClick={() => setModalImageIndex(index)}
+                  >
+                    <img
+                      src={image}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/placeholder-property.jpg';
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

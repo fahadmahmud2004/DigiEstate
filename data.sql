@@ -158,7 +158,8 @@ ALTER TYPE public.property_availability OWNER TO postgres;
 CREATE TYPE public.property_status AS ENUM (
     'Pending Verification',
     'Active',
-    'Flagged'
+    'Flagged',
+    'Rejected'
 );
 
 
@@ -732,6 +733,123 @@ ALTER TABLE ONLY public.properties
 ALTER TABLE ONLY public.reviews
     ADD CONSTRAINT reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
+-- Add triggers for property status changes and deletions
+-- Trigger function for property status changes
+CREATE OR REPLACE FUNCTION notify_property_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If property is being flagged or rejected, notify the owner
+    IF (NEW.status = 'Flagged' OR NEW.status = 'Rejected') AND (OLD.status != 'Flagged' AND OLD.status != 'Rejected') THEN
+        INSERT INTO notifications (user_id, type, title, message, data, created_at)
+        VALUES (
+            NEW.owner_id,
+            'admin',
+            CASE 
+                WHEN NEW.status = 'Flagged' THEN 'Property Flagged'
+                WHEN NEW.status = 'Rejected' THEN 'Property Rejected'
+            END,
+            CASE 
+                WHEN NEW.status = 'Flagged' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been flagged by an administrator for review.'
+                WHEN NEW.status = 'Rejected' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been rejected by an administrator.'
+            END,
+            jsonb_build_object(
+                'propertyId', NEW.id,
+                'propertyTitle', COALESCE(NEW.title, 'Untitled Property'),
+                'oldStatus', OLD.status,
+                'newStatus', NEW.status,
+                'action', 'status_change'
+            ),
+            NOW()
+        );
+    END IF;
+    
+    -- If property is being approved (status changed to Active), notify the owner
+    IF NEW.status = 'Active' AND OLD.status != 'Active' THEN
+        INSERT INTO notifications (user_id, type, title, message, data, created_at)
+        VALUES (
+            NEW.owner_id,
+            'admin',
+            'Property Approved',
+            'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been approved and is now live on the platform.',
+            jsonb_build_object(
+                'propertyId', NEW.id,
+                'propertyTitle', COALESCE(NEW.title, 'Untitled Property'),
+                'oldStatus', OLD.status,
+                'newStatus', NEW.status,
+                'action', 'status_change'
+            ),
+            NOW()
+        );
+    END IF;
+    
+    RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log the error but don't fail the transaction
+        RAISE WARNING 'Error in notify_property_status_change: %', SQLERRM;
+        RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger for property status changes
+CREATE TRIGGER property_status_change_trigger
+    AFTER UPDATE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_property_status_change();
+
+-- Trigger function for property deletions
+CREATE OR REPLACE FUNCTION notify_property_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Notify the property owner when their property is deleted
+    INSERT INTO notifications (user_id, type, title, message, data, created_at)
+    VALUES (
+        OLD.owner_id,
+        'admin',
+        'Property Deleted',
+        'Your property "' || COALESCE(OLD.title, 'Untitled Property') || '" has been deleted by an administrator.',
+        jsonb_build_object(
+            'propertyId', OLD.id,
+            'propertyTitle', COALESCE(OLD.title, 'Untitled Property'),
+            'action', 'deletion'
+        ),
+        NOW()
+    );
+    
+    RETURN OLD;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log the error but don't fail the transaction
+        RAISE WARNING 'Error in notify_property_deletion: %', SQLERRM;
+        RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger for property deletions
+CREATE TRIGGER property_deletion_trigger
+    AFTER DELETE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_property_deletion();
+
+-- Simple test trigger for debugging
+CREATE OR REPLACE FUNCTION test_property_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Just log the deletion without inserting notification
+    RAISE NOTICE 'Property deleted: %', OLD.title;
+    RETURN OLD;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Error in test_property_deletion: %', SQLERRM;
+        RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Test trigger for property deletions
+CREATE TRIGGER test_property_deletion_trigger
+    AFTER DELETE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION test_property_deletion();
 
 -- Completed on 2025-07-26 02:42:40 +06
 

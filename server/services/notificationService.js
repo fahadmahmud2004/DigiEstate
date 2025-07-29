@@ -29,8 +29,8 @@ class NotificationService {
       const db = getDB();
       
       const result = await db.query(
-        `INSERT INTO notifications (user_id, type, title, message, data, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        `INSERT INTO notifications (user_id, type, title, message, data, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          RETURNING *`,
         [
           notificationData.userId,
@@ -57,7 +57,7 @@ class NotificationService {
       
       const result = await db.query(
         `UPDATE notifications 
-         SET is_read = true, updated_at = NOW() 
+         SET is_read = true
          WHERE id = $1 AND user_id = $2
          RETURNING *`,
         [notificationId, userId]
@@ -118,8 +118,7 @@ class NotificationService {
              message_notifications = $4, 
              admin_notifications = $5, 
              system_notifications = $6, 
-             email_notifications = $7,
-             updated_at = NOW()
+             email_notifications = $7
          WHERE user_id = $1
          RETURNING *`,
         [

@@ -117,7 +117,7 @@ export function CreateListing() {
       navigate("/my-listings");
     } catch (error) {
       toast({ title: "Error", description: "Failed to create property listing.", variant: "destructive" });
-    } finally {
+    } finally {      
       setLoading(false);
     }
   };
@@ -189,17 +189,17 @@ export function CreateListing() {
                     control={control}
                     rules={{ required: "Property type is required" }}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Select property type" /></SelectTrigger>
-                        <SelectContent>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger><SelectValue placeholder="Select property type" /></SelectTrigger>
+                      <SelectContent>
                           <SelectItem value="Flat">Flat</SelectItem>
                           <SelectItem value="Office Apartment">Office Apartment</SelectItem>
                           <SelectItem value="Land">Land</SelectItem>
                           <SelectItem value="Garage">Garage</SelectItem>
                           <SelectItem value="Godown">Godown</SelectItem>
                           <SelectItem value="Plot">Plot</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      </SelectContent>
+                    </Select>
                     )}
                   />
                   {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type.message}</p>}
@@ -211,14 +211,14 @@ export function CreateListing() {
                     control={control}
                     rules={{ required: "Availability is required" }}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Select availability" /></SelectTrigger>
-                        <SelectContent>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger><SelectValue placeholder="Select availability" /></SelectTrigger>
+                      <SelectContent>
                           <SelectItem value="Available">Available</SelectItem>
                           <SelectItem value="Occupied">Occupied</SelectItem>
-                          <SelectItem value="Under Maintenance">Under Maintenance</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <SelectItem value="Under Maintenance">Under Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
                     )}
                   />
                   {errors.availability && <p className="text-red-500 text-sm mt-1">{errors.availability.message}</p>}

@@ -56,119 +56,161 @@ class PropertyService {
     try {
       const db = getDB();
       let query = `
-        SELECT p.*, u.name as owner_name, u.email as owner_email, u.phone as owner_phone, u.avatar as owner_avatar
+        SELECT p.*, u.name as owner_name, u.email as owner_email, u.phone as owner_phone, u.avatar as owner_avatar, u.reputation as owner_reputation
         FROM properties p
         LEFT JOIN users u ON p.owner_id = u.id
-        WHERE p.status = 'Active'
       `;
-      const queryParams = [];
-      let paramIndex = 1;
-      const addFilter = (clause, value) => {
-        query += ` AND ${clause}`;
-        queryParams.push(value);
-        paramIndex++;
-      };
       
-      // Text search
-      if (filters.search) {
-        addFilter(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}) OR LOWER(p.location) LIKE LOWER($${paramIndex}))`, `%${filters.search}%`);
+      // For admin users, don't filter by status unless specifically requested
+      // For regular users, only show active properties
+      if (filters.status) {
+        query += ` WHERE p.status = $1`;
+        const queryParams = [filters.status];
+        let paramIndex = 2;
+        const addFilter = (clause, value) => {
+          query += ` AND ${clause}`;
+          queryParams.push(value);
+          paramIndex++;
+        };
+        
+        // Add other filters
+        this.addFiltersToQuery(query, addFilter, filters, paramIndex);
+        
+        const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
+        const countResult = await db.query(countQuery, queryParams);
+        const total = parseInt(countResult.rows[0].count, 10);
+        
+        // Add pagination
+        const page = filters.page || 1;
+        const limit = filters.limit || 12;
+        const offset = (page - 1) * limit;
+        
+        query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryParams.push(limit, offset);
+        
+        const result = await db.query(query, queryParams);
+        
+        return {
+          properties: result.rows.map(row => PropertyService.formatProperty(row)),
+          total,
+          page,
+          totalPages: Math.ceil(total / limit)
+        };
+      } else {
+        // Regular user flow - only show active properties
+        query += ` WHERE p.status = 'Active'`;
+        const queryParams = [];
+        let paramIndex = 1;
+        const addFilter = (clause, value) => {
+          query += ` AND ${clause}`;
+          queryParams.push(value);
+          paramIndex++;
+        };
+        
+        // Add other filters
+        this.addFiltersToQuery(query, addFilter, filters, paramIndex);
+        
+        const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
+        const countResult = await db.query(countQuery, queryParams);
+        const total = parseInt(countResult.rows[0].count, 10);
+        
+        // Add pagination
+        const page = filters.page || 1;
+        const limit = filters.limit || 12;
+        const offset = (page - 1) * limit;
+        
+        query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryParams.push(limit, offset);
+        
+        const result = await db.query(query, queryParams);
+        
+        return {
+          properties: result.rows.map(row => PropertyService.formatProperty(row)),
+          total,
+          page,
+          totalPages: Math.ceil(total / limit)
+        };
       }
-      
-      // Listing type (rent/sale)
-      if (filters.type) {
-        addFilter(`p.listing_type = $${paramIndex}`, filters.type === 'rent' ? 'Rent' : 'Sale');
-      }
-      
-      // Price range
-      if (filters.priceMin) {
-        addFilter(`p.price >= $${paramIndex}`, filters.priceMin);
-      }
-      if (filters.priceMax) {
-        addFilter(`p.price <= $${paramIndex}`, filters.priceMax);
-      }
-      
-      // Property type (single selection)
-      if (filters.propertyType) {
-        addFilter(`p.type = $${paramIndex}`, filters.propertyType);
-      }
-      
-      // Bedrooms (minimum count)
-      if (filters.bedrooms) {
-        addFilter(`p.bedrooms >= $${paramIndex}`, filters.bedrooms);
-      }
-      
-      // Bathrooms (minimum count)
-      if (filters.bathrooms) {
-        addFilter(`p.bathrooms >= $${paramIndex}`, filters.bathrooms);
-      }
-      
-      // Amenities
-      if (filters.amenities && filters.amenities.length > 0) {
-        if (filters.amenities.includes('AC')) {
-          query += ` AND p.has_ac = true`;
-        }
-        if (filters.amenities.includes('Lift')) {
-          query += ` AND p.has_lift = true`;
-        }
-        if (filters.amenities.includes('Parking')) {
-          query += ` AND p.has_parking = true`;
-        }
-      }
-      
-      // Property type-specific filters
-      if (filters.area) {
-        addFilter(`p.area >= $${paramIndex}`, filters.area);
-      }
-      
-      if (filters.roadWidth) {
-        addFilter(`p.road_width >= $${paramIndex}`, filters.roadWidth);
-      }
-      
-      if (filters.floorNumber) {
-        addFilter(`p.floor_number >= $${paramIndex}`, filters.floorNumber);
-      }
-      
-      if (filters.totalFloors) {
-        addFilter(`p.total_floors >= $${paramIndex}`, filters.totalFloors);
-      }
-      
-      if (filters.parkingSpaces) {
-        addFilter(`p.parking_spaces >= $${paramIndex}`, filters.parkingSpaces);
-      }
-      
-      if (filters.isCornerPlot !== undefined) {
-        addFilter(`p.is_corner_plot = $${paramIndex}`, filters.isCornerPlot);
-      }
-      
-      if (filters.isFurnished !== undefined) {
-        addFilter(`p.is_furnished = $${paramIndex}`, filters.isFurnished);
-      }
-      
-      const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
-      const countResult = await db.query(countQuery, queryParams);
-      const total = parseInt(countResult.rows[0].count, 10);
-
-      // Sorting
-      switch (filters.sortBy) {
-        case 'price_asc': query += ' ORDER BY p.price ASC'; break;
-        case 'price_desc': query += ' ORDER BY p.price DESC'; break;
-        case 'popular': query += ' ORDER BY p.views DESC, p.bookings DESC'; break;
-        default: query += ' ORDER BY p.created_at DESC'; break;
-      }
-
-      const limit = parseInt(filters.limit, 10) || 12;
-      const page = parseInt(filters.page, 10) || 1;
-      const offset = (page - 1) * limit;
-      query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-      queryParams.push(limit, offset);
-
-      const result = await db.query(query, queryParams);
-      const properties = result.rows.map(this.formatProperty);
-
-      return { properties, total, page, totalPages: Math.ceil(total / limit), limit };
     } catch (err) {
-      console.error('[PropertyService] Error fetching properties:', err);
-      throw new Error(`Database error while fetching properties.`);
+      console.error(`[PropertyService] Error listing properties: ${err.message}`);
+      throw new Error(`Database error while listing properties: ${err.message}`);
+    }
+  }
+
+  static addFiltersToQuery(query, addFilter, filters, paramIndex) {
+    // Text search
+    if (filters.search) {
+      addFilter(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}) OR LOWER(p.location) LIKE LOWER($${paramIndex}))`, `%${filters.search}%`);
+    }
+    
+    // Listing type (rent/sale)
+    if (filters.type) {
+      addFilter(`p.listing_type = $${paramIndex}`, filters.type === 'rent' ? 'Rent' : 'Sale');
+    }
+    
+    // Price range
+    if (filters.priceMin) {
+      addFilter(`p.price >= $${paramIndex}`, filters.priceMin);
+    }
+    if (filters.priceMax) {
+      addFilter(`p.price <= $${paramIndex}`, filters.priceMax);
+    }
+    
+    // Property type (single selection)
+    if (filters.propertyType) {
+      addFilter(`p.type = $${paramIndex}`, filters.propertyType);
+    }
+    
+    // Bedrooms (minimum count)
+    if (filters.bedrooms) {
+      addFilter(`p.bedrooms >= $${paramIndex}`, filters.bedrooms);
+    }
+    
+    // Bathrooms (minimum count)
+    if (filters.bathrooms) {
+      addFilter(`p.bathrooms >= $${paramIndex}`, filters.bathrooms);
+    }
+    
+    // Amenities
+    if (filters.amenities && filters.amenities.length > 0) {
+      if (filters.amenities.includes('AC')) {
+        query += ` AND p.has_ac = true`;
+      }
+      if (filters.amenities.includes('Lift')) {
+        query += ` AND p.has_lift = true`;
+      }
+      if (filters.amenities.includes('Parking')) {
+        query += ` AND p.has_parking = true`;
+      }
+    }
+    
+    // Property type-specific filters
+    if (filters.area) {
+      addFilter(`p.area >= $${paramIndex}`, filters.area);
+    }
+    
+    if (filters.roadWidth) {
+      addFilter(`p.road_width >= $${paramIndex}`, filters.roadWidth);
+    }
+    
+    if (filters.floorNumber) {
+      addFilter(`p.floor_number >= $${paramIndex}`, filters.floorNumber);
+    }
+    
+    if (filters.totalFloors) {
+      addFilter(`p.total_floors >= $${paramIndex}`, filters.totalFloors);
+    }
+    
+    if (filters.parkingSpaces) {
+      addFilter(`p.parking_spaces >= $${paramIndex}`, filters.parkingSpaces);
+    }
+    
+    if (filters.isCornerPlot !== undefined) {
+      addFilter(`p.is_corner_plot = $${paramIndex}`, filters.isCornerPlot);
+    }
+    
+    if (filters.isFurnished !== undefined) {
+      addFilter(`p.is_furnished = $${paramIndex}`, filters.isFurnished);
     }
   }
 
@@ -194,6 +236,7 @@ class PropertyService {
   static async create(propertyData, ownerId) {
     try {
       const db = getDB();
+      console.log('[PropertyService] Creating property with data:', propertyData);
 
       // Safely parse JSON string fields from the form data
       const features = JSON.parse(propertyData.features || '{}');
@@ -201,6 +244,7 @@ class PropertyService {
       
       // Get image paths and other features from the data objects
       const imageUrls = propertyData.images || [];
+      console.log('[PropertyService] Image URLs:', imageUrls);
       const customFeatures = features.customFeatures || [];
       const nearbyFacilitiesJson = JSON.stringify(nearbyFacilities);
 
@@ -244,7 +288,9 @@ class PropertyService {
         propertyData.listingType                // listing_type
       ];
 
+      console.log('[PropertyService] Executing query with values:', values);
       const result = await db.query(query, values);
+      console.log('[PropertyService] Database result:', result.rows[0]);
       return this.formatProperty(result.rows[0]);
 
     } catch (err) {

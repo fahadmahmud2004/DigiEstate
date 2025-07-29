@@ -3,6 +3,7 @@ const router = express.Router();
 const AdminService = require('../services/adminService.js');
 const ComplaintService = require('../services/complaintService.js');
 const { requireAdmin } = require('./middleware/adminAuth.js');
+const { getDB } = require('../config/database.js');
 
 // Get all users with pagination
 router.get('/users', requireAdmin, async (req, res) => {
@@ -52,9 +53,11 @@ router.get('/users', requireAdmin, async (req, res) => {
 router.put('/users/:userId/toggle-block', requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log(`[ADMIN] PUT /api/admin/users/${userId}/toggle-block`);
+    const { reason } = req.body;
     
-    const updatedUser = await AdminService.toggleUserBlock(userId);
+    console.log(`[ADMIN] PUT /api/admin/users/${userId}/toggle-block - reason: ${reason || 'none'}`);
+    
+    const updatedUser = await AdminService.toggleUserBlock(userId, reason);
     
     const formattedUser = {
       _id: updatedUser.id,
@@ -97,37 +100,11 @@ router.get('/properties', requireAdmin, async (req, res) => {
     
     const result = await AdminService.getAllProperties(page, limit);
     
-    // Format properties for frontend
-    const formattedProperties = result.properties.map(property => ({
-      _id: property.id,
-      title: property.title,
-      description: property.description,
-      type: property.type,
-      price: property.price,
-      location: property.location,
-      availability: property.availability,
-      images: property.images || [],
-      videos: property.videos || [],
-      features: property.features || {},
-      nearbyFacilities: property.nearby_facilities || [],
-      owner: {
-        _id: property.owner_id,
-        name: property.owner_name || 'Unknown',
-        email: property.owner_email || 'Unknown'
-      },
-      status: property.status,
-      views: property.views || 0,
-      inquiries: property.inquiries || 0,
-      bookings: property.bookings || 0,
-      createdAt: property.created_at,
-      updatedAt: property.updated_at
-    }));
-    
-    console.log(`[ADMIN] Retrieved ${formattedProperties.length} properties successfully`);
+    console.log(`[ADMIN] Retrieved ${result.properties.length} properties successfully`);
     
     res.json({
       success: true,
-      properties: formattedProperties,
+      properties: result.properties,
       total: result.total,
       page: result.page,
       totalPages: result.totalPages
@@ -157,29 +134,7 @@ router.put('/properties/:propertyId/status', requireAdmin, async (req, res) => {
     }
     
     const updatedProperty = await AdminService.updatePropertyStatus(propertyId, status, reason);
-    
-    const formattedProperty = {
-      _id: updatedProperty.id,
-      title: updatedProperty.title,
-      description: updatedProperty.description,
-      type: updatedProperty.type,
-      price: updatedProperty.price,
-      location: updatedProperty.location,
-      availability: updatedProperty.availability,
-      images: updatedProperty.images || [],
-      videos: updatedProperty.videos || [],
-      features: updatedProperty.features || {},
-      nearbyFacilities: updatedProperty.nearby_facilities || [],
-      owner: {
-        _id: updatedProperty.owner_id
-      },
-      status: updatedProperty.status,
-      views: updatedProperty.views || 0,
-      inquiries: updatedProperty.inquiries || 0,
-      bookings: updatedProperty.bookings || 0,
-      createdAt: updatedProperty.created_at,
-      updatedAt: updatedProperty.updated_at
-    };
+    const formattedProperty = AdminService.formatProperty(updatedProperty);
     
     console.log(`[ADMIN] Property ${propertyId} status updated to ${status} successfully`);
     
@@ -190,6 +145,89 @@ router.put('/properties/:propertyId/status', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('[ADMIN] Error updating property status:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Delete property
+router.delete('/properties/:propertyId', requireAdmin, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { reason } = req.body;
+    
+    console.log(`[ADMIN] DELETE /api/admin/properties/${propertyId} - reason: ${reason || 'none'}`);
+    
+    const result = await AdminService.deleteProperty(propertyId, reason);
+    
+    console.log(`[ADMIN] Property ${propertyId} deleted successfully`);
+    
+    res.json({
+      success: true,
+      message: result.message,
+      propertyId: result.propertyId
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error deleting property:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Test delete property without triggers
+router.delete('/properties/:propertyId/test', requireAdmin, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    
+    console.log(`[ADMIN] TEST DELETE /api/admin/properties/${propertyId}/test`);
+    
+    const db = getDB();
+    
+    // First get the property
+    const propertyResult = await db.query(
+      'SELECT * FROM properties WHERE id = $1',
+      [propertyId]
+    );
+    
+    if (propertyResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found'
+      });
+    }
+    
+    const property = propertyResult.rows[0];
+    console.log(`[ADMIN] Found property: ${property.title}`);
+    
+    // Temporarily disable triggers for testing
+    await db.query('SET session_replication_role = replica;');
+    
+    // Delete the property
+    const result = await db.query(
+      'DELETE FROM properties WHERE id = $1 RETURNING id',
+      [propertyId]
+    );
+    
+    // Re-enable triggers
+    await db.query('SET session_replication_role = DEFAULT;');
+    
+    if (result.rows.length === 0) {
+      throw new Error('Failed to delete property');
+    }
+    
+    console.log(`[ADMIN] Property ${propertyId} deleted successfully (test)`);
+    
+    res.json({
+      success: true,
+      message: `Property "${property.title}" has been deleted successfully (test)`,
+      propertyId: result.propertyId
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error deleting property (test):', error.message);
     res.status(500).json({
       success: false,
       error: error.message

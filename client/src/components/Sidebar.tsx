@@ -11,7 +11,11 @@ import {
   Bell,
   Settings,
   Shield,
-  Database
+  Database,
+  Users,
+  Gavel,
+  FileText,
+  Activity
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -27,7 +31,11 @@ const navigation = [
 ]
 
 const adminNavigation = [
-  { name: "Admin Dashboard", href: "/admin/dashboard", icon: Shield },
+  { name: "Dashboard", href: "/admin/dashboard", icon: Activity },
+  { name: "All Properties", href: "/admin/properties", icon: Building2 },
+  { name: "All Users", href: "/admin/users", icon: Users },
+  { name: "Appeals", href: "/admin/appeals", icon: Gavel },
+  { name: "Reports", href: "/admin/reports", icon: FileText },
   { name: "Seed Database", href: "/admin/seed", icon: Database },
 ]
 
@@ -62,69 +70,62 @@ export function Sidebar() {
           {user?.name || "Unknown User"}
         </Link>
 
-        {/* Main navigation items */}
+        {/* Navigation items */}
         <nav className="flex-1 px-2 space-y-1">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
-                  isActive
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
-                    : "text-muted-readable hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-readable"
-                )}
-              >
-                <item.icon
+          {isAdmin ? (
+            // Admin navigation
+            adminNavigation.map((item) => {
+              const isActive = location.pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
                   className={cn(
-                    "mr-3 h-5 w-5 flex-shrink-0",
+                    "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive
-                      ? "text-blue-500"
-                      : "text-muted-readable group-hover:text-readable"
+                      ? "bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100"
+                      : "text-muted-readable hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-readable"
                   )}
-                />
-                {item.name}
-              </Link>
-            )
-          })}
-
-          {/* Admin section */}
-          {isAdmin && (
-            <>
-              <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
-              <div className="px-2 py-2">
-                <h3 className="text-xs font-semibold text-muted-readable uppercase tracking-wider">
-                  Admin
-                </h3>
-              </div>
-              {adminNavigation.map((item) => {
-                const isActive = location.pathname === item.href
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
+                >
+                  <item.icon
                     className={cn(
-                      "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                      "mr-3 h-5 w-5 flex-shrink-0",
                       isActive
-                        ? "bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100"
-                        : "text-muted-readable hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-readable"
+                        ? "text-red-500"
+                        : "text-muted-readable group-hover:text-readable"
                     )}
-                  >
-                    <item.icon
-                      className={cn(
-                        "mr-3 h-5 w-5 flex-shrink-0",
-                        isActive
-                          ? "text-red-500"
-                          : "text-muted-readable group-hover:text-readable"
-                      )}
-                    />
-                    {item.name}
-                  </Link>
-                )
-              })}
-            </>
+                  />
+                  {item.name}
+                </Link>
+              )
+            })
+          ) : (
+            // Regular user navigation
+            navigation.map((item) => {
+              const isActive = location.pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
+                    "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                    isActive
+                      ? "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
+                      : "text-muted-readable hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-readable"
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      "mr-3 h-5 w-5 flex-shrink-0",
+                      isActive
+                        ? "text-blue-500"
+                        : "text-muted-readable group-hover:text-readable"
+                    )}
+                  />
+                  {item.name}
+                </Link>
+              )
+            })
           )}
         </nav>
       </div>

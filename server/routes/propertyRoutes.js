@@ -30,10 +30,19 @@ const upload = multer({ storage: storage });
 // Create a new property
 router.post('/', requireUser, upload.array('images', 10), async (req, res) => {
   try {
+    console.log('[PROPERTY ROUTE] Received POST request to create property.');
+    console.log('--- Request Body (Text Fields) ---');
+    console.log(req.body);
+    console.log('--- Request Files (Images) ---');
+    console.log(req.files);
+    console.log('-----------------------------------');
+
     const propertyData = {
       ...req.body,
       images: req.files ? req.files.map(file => file.path) : []
     };
+
+    console.log('[PROPERTY ROUTE] Processed propertyData:', propertyData);
 
     const newProperty = await PropertyService.create(propertyData, req.user.id);
 
