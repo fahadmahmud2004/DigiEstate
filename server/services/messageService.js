@@ -19,7 +19,7 @@ class MessageService {
 
       const insertQuery = `
         INSERT INTO messages (id, sender_id, receiver_id, content, attachments, is_read, conversation_id, property_id, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
 
@@ -28,7 +28,7 @@ class MessageService {
         senderId,
         receiverId,
         content.trim(),
-        JSON.stringify(attachments),
+        attachments, // Pass attachments directly as array
         false,
         conversationId,
         propertyId,
@@ -68,10 +68,14 @@ class MessageService {
     try {
       const db = getDB();
       const query = `
-        SELECT DISTINCT ON (conversation_id) *
-        FROM messages
-        WHERE sender_id = $1 OR receiver_id = $1
-        ORDER BY conversation_id, created_at DESC
+        SELECT DISTINCT ON (m.conversation_id) m.*,
+               s.name as sender_name, s.avatar as sender_avatar,
+               r.name as receiver_name, r.avatar as receiver_avatar
+        FROM messages m
+        LEFT JOIN users s ON m.sender_id = s.id
+        LEFT JOIN users r ON m.receiver_id = r.id
+        WHERE m.sender_id = $1 OR m.receiver_id = $1
+        ORDER BY m.conversation_id, m.created_at DESC
       `;
       const result = await db.query(query, [userId]);
 
@@ -98,9 +102,19 @@ class MessageService {
           ],
           lastMessage: {
             _id: msg.id,
+            sender: {
+              _id: msg.sender_id,
+              name: msg.sender_name || 'Unknown',
+              avatar: msg.sender_avatar || null
+            },
+            receiver: {
+              _id: msg.receiver_id,
+              name: msg.receiver_name || 'Unknown',
+              avatar: msg.receiver_avatar || null
+            },
             content: msg.content,
-            createdAt: msg.created_at,
-            isRead: msg.is_read
+            isRead: msg.is_read,
+            createdAt: msg.created_at
           },
           unreadCount,
           property: msg.property_id ? {
@@ -123,15 +137,28 @@ class MessageService {
     try {
       const db = getDB();
       const query = `
-        SELECT * FROM messages
-        WHERE conversation_id = $1 AND (sender_id = $2 OR receiver_id = $2)
-        ORDER BY created_at ASC
+        SELECT m.*, 
+               s.name as sender_name, s.avatar as sender_avatar,
+               r.name as receiver_name, r.avatar as receiver_avatar
+        FROM messages m
+        LEFT JOIN users s ON m.sender_id = s.id
+        LEFT JOIN users r ON m.receiver_id = r.id
+        WHERE m.conversation_id = $1 AND (m.sender_id = $2 OR m.receiver_id = $2)
+        ORDER BY m.created_at ASC
       `;
       const result = await db.query(query, [conversationId, userId]);
       return result.rows.map(row => ({
         _id: row.id,
-        sender: { _id: row.sender_id },
-        receiver: { _id: row.receiver_id },
+        sender: { 
+          _id: row.sender_id,
+          name: row.sender_name || 'Unknown',
+          avatar: row.sender_avatar || null
+        },
+        receiver: { 
+          _id: row.receiver_id,
+          name: row.receiver_name || 'Unknown',
+          avatar: row.receiver_avatar || null
+        },
         content: row.content,
         attachments: row.attachments,
         isRead: row.is_read,

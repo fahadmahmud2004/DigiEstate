@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { getConversations, getMessages, sendMessage, markConversationAsRead, Conversation, Message } from "@/api/messages"
 import { getUsers, searchUsers, User } from "@/api/users"
 import { useToast } from "@/hooks/useToast"
+import { useAuth } from "@/contexts/AuthContext"
 
 export function Messages() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -23,6 +24,7 @@ export function Messages() {
   const [searchQuery, setSearchQuery] = useState("")
   const [loadingUsers, setLoadingUsers] = useState(false)
   const { toast } = useToast()
+  const { user: currentUser } = useAuth()
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -80,13 +82,13 @@ export function Messages() {
   }, [selectedConversation, toast])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return
+    if (!newMessage.trim() || !selectedConversation || !currentUser) return
 
     setSendingMessage(true)
     try {
       console.log("Sending message:", newMessage)
       const conversation = conversations.find(c => c._id === selectedConversation)
-      const receiverId = conversation?.participants.find(p => p._id !== 'current-user')?._id
+      const receiverId = conversation?.participants.find(p => p._id !== currentUser.id)?._id
 
       if (receiverId) {
         const response = await sendMessage({
