@@ -2,9 +2,6 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5
--- Dumped by pg_dump version 17.5
-
 -- Started on 2025-07-26 02:42:39 +06
 
 SET statement_timeout = 0;
@@ -13,17 +10,16 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
+-- SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 865 (class 1247 OID 18740)
--- Name: booking_status; Type: TYPE; Schema: public; Owner: postgres
+-- Types (Enums)
 --
-
+DROP TYPE IF EXISTS public.booking_status CASCADE;
 CREATE TYPE public.booking_status AS ENUM (
     'Pending',
     'Accepted',
@@ -31,71 +27,41 @@ CREATE TYPE public.booking_status AS ENUM (
     'Completed',
     'Cancelled'
 );
-
-
 ALTER TYPE public.booking_status OWNER TO postgres;
 
---
--- TOC entry 883 (class 1247 OID 18792)
--- Name: complaint_status; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.complaint_status CASCADE;
 CREATE TYPE public.complaint_status AS ENUM (
     'open',
     'in-progress',
     'resolved',
     'dismissed'
 );
-
-
 ALTER TYPE public.complaint_status OWNER TO postgres;
 
---
--- TOC entry 877 (class 1247 OID 18776)
--- Name: complaint_target_type; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.complaint_target_type CASCADE;
 CREATE TYPE public.complaint_target_type AS ENUM (
     'user',
     'property'
 );
-
-
 ALTER TYPE public.complaint_target_type OWNER TO postgres;
 
---
--- TOC entry 880 (class 1247 OID 18782)
--- Name: complaint_type; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.complaint_type CASCADE;
 CREATE TYPE public.complaint_type AS ENUM (
     'Fraudulent Listing',
     'Inappropriate Behavior',
     'Payment Issues',
     'Other'
 );
-
-
 ALTER TYPE public.complaint_type OWNER TO postgres;
 
---
--- TOC entry 913 (class 1247 OID 19014)
--- Name: listing_status; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.listing_status CASCADE;
 CREATE TYPE public.listing_status AS ENUM (
     'Sale',
     'Rent'
 );
-
-
 ALTER TYPE public.listing_status OWNER TO postgres;
 
---
--- TOC entry 886 (class 1247 OID 18802)
--- Name: notification_type; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.notification_type CASCADE;
 CREATE TYPE public.notification_type AS ENUM (
     'booking',
     'payment',
@@ -103,73 +69,43 @@ CREATE TYPE public.notification_type AS ENUM (
     'admin',
     'system'
 );
-
-
 ALTER TYPE public.notification_type OWNER TO postgres;
 
---
--- TOC entry 868 (class 1247 OID 18752)
--- Name: payment_method; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.payment_method CASCADE;
 CREATE TYPE public.payment_method AS ENUM (
     'Cash',
     'Bank Transfer',
     'Mobile Payment',
     'Check'
 );
-
-
 ALTER TYPE public.payment_method OWNER TO postgres;
 
---
--- TOC entry 871 (class 1247 OID 18762)
--- Name: payment_status; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.payment_status CASCADE;
 CREATE TYPE public.payment_status AS ENUM (
     'Pending',
     'Completed',
     'Failed'
 );
-
-
 ALTER TYPE public.payment_status OWNER TO postgres;
 
---
--- TOC entry 859 (class 1247 OID 18724)
--- Name: property_availability; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.property_availability CASCADE;
 CREATE TYPE public.property_availability AS ENUM (
     'Available',
     'Occupied',
     'Under Maintenance'
 );
-
-
 ALTER TYPE public.property_availability OWNER TO postgres;
 
---
--- TOC entry 862 (class 1247 OID 18732)
--- Name: property_status; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.property_status CASCADE;
 CREATE TYPE public.property_status AS ENUM (
     'Pending Verification',
     'Active',
     'Flagged',
     'Rejected'
 );
-
-
 ALTER TYPE public.property_status OWNER TO postgres;
 
---
--- TOC entry 856 (class 1247 OID 18710)
--- Name: property_type; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.property_type CASCADE;
 CREATE TYPE public.property_type AS ENUM (
     'Flat',
     'Office Apartment',
@@ -178,151 +114,46 @@ CREATE TYPE public.property_type AS ENUM (
     'Godown',
     'Plot'
 );
-
-
 ALTER TYPE public.property_type OWNER TO postgres;
 
---
--- TOC entry 874 (class 1247 OID 18770)
--- Name: review_type; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.review_type CASCADE;
 CREATE TYPE public.review_type AS ENUM (
     'property',
     'user'
 );
-
-
 ALTER TYPE public.review_type OWNER TO postgres;
 
---
--- TOC entry 853 (class 1247 OID 18705)
--- Name: user_role; Type: TYPE; Schema: public; Owner: postgres
---
-
+DROP TYPE IF EXISTS public.user_role CASCADE;
 CREATE TYPE public.user_role AS ENUM (
     'user',
     'admin'
 );
-
-
 ALTER TYPE public.user_role OWNER TO postgres;
 
 SET default_tablespace = '';
-
 SET default_table_access_method = heap;
 
 --
--- TOC entry 219 (class 1259 OID 18871)
--- Name: bookings; Type: TABLE; Schema: public; Owner: postgres
+-- Tables
 --
-
-CREATE TABLE public.bookings (
+CREATE TABLE IF NOT EXISTS public.users (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    property_id uuid NOT NULL,
-    buyer_id uuid NOT NULL,
-    seller_id uuid NOT NULL,
-    message text NOT NULL,
-    status public.booking_status DEFAULT 'Pending'::public.booking_status NOT NULL,
+    email character varying(255) NOT NULL,
+    password character varying(255) NOT NULL,
+    name character varying(255),
+    phone character varying(50),
+    avatar text,
+    role public.user_role DEFAULT 'user'::public.user_role NOT NULL,
+    is_active boolean DEFAULT true,
+    reputation numeric(3,2) DEFAULT 4.5,
+    refresh_token character varying(255),
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    preferred_date date,
-    preferred_time character varying(50),
-    reference_number character varying(255) NOT NULL
+    last_login_at timestamp without time zone DEFAULT now() NOT NULL
 );
+ALTER TABLE public.users OWNER TO postgres;
 
-
-ALTER TABLE public.bookings OWNER TO postgres;
-
---
--- TOC entry 222 (class 1259 OID 18945)
--- Name: complaints; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.complaints (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    complainant_id uuid NOT NULL,
-    target_id uuid NOT NULL,
-    target_type public.complaint_target_type NOT NULL,
-    type public.complaint_type NOT NULL,
-    description text NOT NULL,
-    evidence text[] DEFAULT '{}'::text[],
-    status public.complaint_status DEFAULT 'open'::public.complaint_status NOT NULL,
-    resolution text,
-    admin_notes text,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.complaints OWNER TO postgres;
-
---
--- TOC entry 220 (class 1259 OID 18900)
--- Name: messages; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.messages (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    sender_id uuid NOT NULL,
-    receiver_id uuid NOT NULL,
-    content text NOT NULL,
-    attachments text[] DEFAULT '{}'::text[],
-    is_read boolean DEFAULT false,
-    conversation_id character varying(255) NOT NULL,
-    property_id uuid,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.messages OWNER TO postgres;
-
---
--- TOC entry 224 (class 1259 OID 18978)
--- Name: notification_preferences; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.notification_preferences (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    booking_notifications boolean DEFAULT true,
-    payment_notifications boolean DEFAULT true,
-    message_notifications boolean DEFAULT true,
-    admin_notifications boolean DEFAULT true,
-    system_notifications boolean DEFAULT true,
-    email_notifications boolean DEFAULT true,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.notification_preferences OWNER TO postgres;
-
---
--- TOC entry 223 (class 1259 OID 18962)
--- Name: notifications; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.notifications (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    type public.notification_type NOT NULL,
-    title character varying(255) NOT NULL,
-    message text NOT NULL,
-    is_read boolean DEFAULT false,
-    data jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.notifications OWNER TO postgres;
-
---
--- TOC entry 218 (class 1259 OID 18831)
--- Name: properties; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.properties (
+CREATE TABLE IF NOT EXISTS public.properties (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     title character varying(255) NOT NULL,
     description text NOT NULL,
@@ -366,16 +197,54 @@ CREATE TABLE public.properties (
     CONSTRAINT properties_total_floors_check CHECK ((total_floors >= 1)),
     CONSTRAINT properties_views_check CHECK ((views >= 0))
 );
-
-
 ALTER TABLE public.properties OWNER TO postgres;
 
---
--- TOC entry 221 (class 1259 OID 18927)
--- Name: reviews; Type: TABLE; Schema: public; Owner: postgres
---
+CREATE TABLE IF NOT EXISTS public.bookings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    property_id uuid NOT NULL,
+    buyer_id uuid NOT NULL,
+    seller_id uuid NOT NULL,
+    message text NOT NULL,
+    status public.booking_status DEFAULT 'Pending'::public.booking_status NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    preferred_date date,
+    preferred_time character varying(50),
+    reference_number character varying(255) NOT NULL
+);
+ALTER TABLE public.bookings OWNER TO postgres;
 
-CREATE TABLE public.reviews (
+CREATE TABLE IF NOT EXISTS public.complaints (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    complainant_id uuid NOT NULL,
+    target_id uuid NOT NULL,
+    target_type public.complaint_target_type NOT NULL,
+    type public.complaint_type NOT NULL,
+    description text NOT NULL,
+    evidence text[] DEFAULT '{}'::text[],
+    status public.complaint_status DEFAULT 'open'::public.complaint_status NOT NULL,
+    resolution text,
+    admin_notes text,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.complaints OWNER TO postgres;
+
+CREATE TABLE IF NOT EXISTS public.messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sender_id uuid NOT NULL,
+    receiver_id uuid NOT NULL,
+    content text NOT NULL,
+    attachments text[] DEFAULT '{}'::text[],
+    is_read boolean DEFAULT false,
+    conversation_id character varying(255) NOT NULL,
+    property_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.messages OWNER TO postgres;
+
+CREATE TABLE IF NOT EXISTS public.reviews (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     review_type public.review_type NOT NULL,
     target_id uuid NOT NULL,
@@ -386,412 +255,148 @@ CREATE TABLE public.reviews (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT reviews_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
 );
-
-
 ALTER TABLE public.reviews OWNER TO postgres;
 
---
--- TOC entry 217 (class 1259 OID 18813)
--- Name: users; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    email character varying(255) NOT NULL,
-    password character varying(255) NOT NULL,
-    name character varying(255),
-    phone character varying(50),
-    avatar text,
-    role public.user_role DEFAULT 'user'::public.user_role NOT NULL,
-    is_active boolean DEFAULT true,
-    reputation numeric(3,2) DEFAULT 4.5,
-    refresh_token character varying(255),
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    last_login_at timestamp without time zone DEFAULT now() NOT NULL
+    user_id uuid NOT NULL,
+    type public.notification_type NOT NULL,
+    title character varying(255) NOT NULL,
+    message text NOT NULL,
+    is_read boolean DEFAULT false,
+    data jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
 );
+ALTER TABLE public.notifications OWNER TO postgres;
+
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    booking_notifications boolean DEFAULT true,
+    payment_notifications boolean DEFAULT true,
+    message_notifications boolean DEFAULT true,
+    admin_notifications boolean DEFAULT true,
+    system_notifications boolean DEFAULT true,
+    email_notifications boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.notification_preferences OWNER TO postgres;
+
+
+--
+-- Constraints
+--
+
+-- users table
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_pkey;
+ALTER TABLE public.users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_email_key;
+ALTER TABLE public.users ADD CONSTRAINT users_email_key UNIQUE (email);
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_refresh_token_key;
+ALTER TABLE public.users ADD CONSTRAINT users_refresh_token_key UNIQUE (refresh_token);
+
+-- properties table
+ALTER TABLE public.properties DROP CONSTRAINT IF EXISTS properties_pkey;
+ALTER TABLE public.properties ADD CONSTRAINT properties_pkey PRIMARY KEY (id);
+ALTER TABLE public.properties DROP CONSTRAINT IF EXISTS properties_owner_id_fkey;
+ALTER TABLE public.properties ADD CONSTRAINT properties_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- bookings table
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_pkey;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_pkey PRIMARY KEY (id);
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_reference_number_key;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_reference_number_key UNIQUE (reference_number);
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_unique_user_property;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_unique_user_property UNIQUE (buyer_id, property_id);
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_no_self_booking_check;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_no_self_booking_check CHECK (buyer_id <> seller_id);
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_buyer_id_fkey;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_property_id_fkey;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_property_id_fkey FOREIGN KEY (property_id) REFERENCES public.properties(id) ON DELETE CASCADE;
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_seller_id_fkey;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- complaints table
+ALTER TABLE public.complaints DROP CONSTRAINT IF EXISTS complaints_pkey;
+ALTER TABLE public.complaints ADD CONSTRAINT complaints_pkey PRIMARY KEY (id);
+ALTER TABLE public.complaints DROP CONSTRAINT IF EXISTS complaints_complainant_id_fkey;
+ALTER TABLE public.complaints ADD CONSTRAINT complaints_complainant_id_fkey FOREIGN KEY (complainant_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- messages table
+ALTER TABLE public.messages DROP CONSTRAINT IF EXISTS messages_pkey;
+ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+ALTER TABLE public.messages DROP CONSTRAINT IF EXISTS messages_property_id_fkey;
+ALTER TABLE public.messages ADD CONSTRAINT messages_property_id_fkey FOREIGN KEY (property_id) REFERENCES public.properties(id) ON DELETE SET NULL;
+ALTER TABLE public.messages DROP CONSTRAINT IF EXISTS messages_receiver_id_fkey;
+ALTER TABLE public.messages ADD CONSTRAINT messages_receiver_id_fkey FOREIGN KEY (receiver_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.messages DROP CONSTRAINT IF EXISTS messages_sender_id_fkey;
+ALTER TABLE public.messages ADD CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- reviews table
+ALTER TABLE public.reviews DROP CONSTRAINT IF EXISTS reviews_pkey;
+ALTER TABLE public.reviews ADD CONSTRAINT reviews_pkey PRIMARY KEY (id);
+ALTER TABLE public.reviews DROP CONSTRAINT IF EXISTS unique_review;
+ALTER TABLE public.reviews ADD CONSTRAINT unique_review UNIQUE (review_type, target_id, reviewer_id);
+ALTER TABLE public.reviews DROP CONSTRAINT IF EXISTS reviews_reviewer_id_fkey;
+ALTER TABLE public.reviews ADD CONSTRAINT reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- notifications table
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_pkey;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_user_id_fkey;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- notification_preferences table
+ALTER TABLE public.notification_preferences DROP CONSTRAINT IF EXISTS notification_preferences_pkey;
+ALTER TABLE public.notification_preferences ADD CONSTRAINT notification_preferences_pkey PRIMARY KEY (id);
+ALTER TABLE public.notification_preferences DROP CONSTRAINT IF EXISTS notification_preferences_user_id_key;
+ALTER TABLE public.notification_preferences ADD CONSTRAINT notification_preferences_user_id_key UNIQUE (user_id);
+ALTER TABLE public.notification_preferences DROP CONSTRAINT IF EXISTS notification_preferences_user_id_fkey;
+ALTER TABLE public.notification_preferences ADD CONSTRAINT notification_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+--
+-- Indexes
+--
+CREATE INDEX IF NOT EXISTS idx_bookings_buyer_id ON public.bookings USING btree (buyer_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_property_id ON public.bookings USING btree (property_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_seller_id ON public.bookings USING btree (seller_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_complainant_id ON public.complaints USING btree (complainant_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON public.complaints USING btree (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver_id ON public.messages USING btree (receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON public.messages USING btree (sender_id);
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id ON public.notification_preferences USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications USING btree (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_properties_owner_id ON public.properties USING btree (owner_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewer_id ON public.reviews USING btree (reviewer_id);
 
-
-ALTER TABLE public.users OWNER TO postgres;
-
---
--- TOC entry 3591 (class 2606 OID 18882)
--- Name: bookings bookings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.bookings
-    ADD CONSTRAINT bookings_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3593 (class 2606 OID 19012)
--- Name: bookings bookings_reference_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.bookings
-    ADD CONSTRAINT bookings_reference_number_key UNIQUE (reference_number);
-
-
---
--- TOC entry 3607 (class 2606 OID 18956)
--- Name: complaints complaints_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.complaints
-    ADD CONSTRAINT complaints_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3600 (class 2606 OID 18911)
--- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3617 (class 2606 OID 18990)
--- Name: notification_preferences notification_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.notification_preferences
-    ADD CONSTRAINT notification_preferences_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3619 (class 2606 OID 18992)
--- Name: notification_preferences notification_preferences_user_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.notification_preferences
-    ADD CONSTRAINT notification_preferences_user_id_key UNIQUE (user_id);
-
-
---
--- TOC entry 3614 (class 2606 OID 18972)
--- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3589 (class 2606 OID 18865)
--- Name: properties properties_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.properties
-    ADD CONSTRAINT properties_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3603 (class 2606 OID 18937)
--- Name: reviews reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.reviews
-    ADD CONSTRAINT reviews_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3605 (class 2606 OID 18939)
--- Name: reviews unique_review; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.reviews
-    ADD CONSTRAINT unique_review UNIQUE (review_type, target_id, reviewer_id);
-
-
---
--- TOC entry 3582 (class 2606 OID 18828)
--- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_email_key UNIQUE (email);
-
-
---
--- TOC entry 3584 (class 2606 OID 18826)
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- TOC entry 3586 (class 2606 OID 18830)
--- Name: users users_refresh_token_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_refresh_token_key UNIQUE (refresh_token);
-
-
---
--- TOC entry 3594 (class 1259 OID 18999)
--- Name: idx_bookings_buyer_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_bookings_buyer_id ON public.bookings USING btree (buyer_id);
-
-
---
--- TOC entry 3595 (class 1259 OID 19001)
--- Name: idx_bookings_property_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_bookings_property_id ON public.bookings USING btree (property_id);
-
-
---
--- TOC entry 3596 (class 1259 OID 19000)
--- Name: idx_bookings_seller_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_bookings_seller_id ON public.bookings USING btree (seller_id);
-
-
---
--- TOC entry 3608 (class 1259 OID 19005)
--- Name: idx_complaints_complainant_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_complaints_complainant_id ON public.complaints USING btree (complainant_id);
-
-
---
--- TOC entry 3609 (class 1259 OID 19010)
--- Name: idx_complaints_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_complaints_created_at ON public.complaints USING btree (created_at DESC);
-
-
---
--- TOC entry 3610 (class 1259 OID 19009)
--- Name: idx_complaints_status; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_complaints_status ON public.complaints USING btree (status);
-
-
---
--- TOC entry 3597 (class 1259 OID 19003)
--- Name: idx_messages_receiver_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_messages_receiver_id ON public.messages USING btree (receiver_id);
-
-
---
--- TOC entry 3598 (class 1259 OID 19002)
--- Name: idx_messages_sender_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_messages_sender_id ON public.messages USING btree (sender_id);
-
-
---
--- TOC entry 3615 (class 1259 OID 19008)
--- Name: idx_notification_preferences_user_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_notification_preferences_user_id ON public.notification_preferences USING btree (user_id);
-
-
---
--- TOC entry 3611 (class 1259 OID 19007)
--- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC);
-
-
---
--- TOC entry 3612 (class 1259 OID 19006)
--- Name: idx_notifications_user_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id);
-
-
---
--- TOC entry 3587 (class 1259 OID 18998)
--- Name: idx_properties_owner_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_properties_owner_id ON public.properties USING btree (owner_id);
-
-
---
--- TOC entry 3601 (class 1259 OID 19004)
--- Name: idx_reviews_reviewer_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_reviews_reviewer_id ON public.reviews USING btree (reviewer_id);
-
-
---
--- TOC entry 3621 (class 2606 OID 18890)
--- Name: bookings bookings_buyer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.bookings
-    ADD CONSTRAINT bookings_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
 --
--- TOC entry 3622 (class 2606 OID 18885)
--- Name: bookings bookings_property_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Functions & Triggers
 --
-
-ALTER TABLE ONLY public.bookings
-    ADD CONSTRAINT bookings_property_id_fkey FOREIGN KEY (property_id) REFERENCES public.properties(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3623 (class 2606 OID 18895)
--- Name: bookings bookings_seller_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.bookings
-    ADD CONSTRAINT bookings_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3628 (class 2606 OID 18957)
--- Name: complaints complaints_complainant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.complaints
-    ADD CONSTRAINT complaints_complainant_id_fkey FOREIGN KEY (complainant_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3624 (class 2606 OID 18922)
--- Name: messages messages_property_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_property_id_fkey FOREIGN KEY (property_id) REFERENCES public.properties(id) ON DELETE SET NULL;
-
-
---
--- TOC entry 3625 (class 2606 OID 18917)
--- Name: messages messages_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_receiver_id_fkey FOREIGN KEY (receiver_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3626 (class 2606 OID 18912)
--- Name: messages messages_sender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3630 (class 2606 OID 18993)
--- Name: notification_preferences notification_preferences_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.notification_preferences
-    ADD CONSTRAINT notification_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3629 (class 2606 OID 18973)
--- Name: notifications notifications_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3620 (class 2606 OID 18866)
--- Name: properties properties_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.properties
-    ADD CONSTRAINT properties_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 3627 (class 2606 OID 18940)
--- Name: reviews reviews_reviewer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.reviews
-    ADD CONSTRAINT reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
--- Add triggers for property status changes and deletions
 -- Trigger function for property status changes
 CREATE OR REPLACE FUNCTION notify_property_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- If property is being flagged or rejected, notify the owner
     IF (NEW.status = 'Flagged' OR NEW.status = 'Rejected') AND (OLD.status != 'Flagged' AND OLD.status != 'Rejected') THEN
         INSERT INTO notifications (user_id, type, title, message, data, created_at)
-        VALUES (
-            NEW.owner_id,
-            'admin',
-            CASE 
-                WHEN NEW.status = 'Flagged' THEN 'Property Flagged'
-                WHEN NEW.status = 'Rejected' THEN 'Property Rejected'
-            END,
-            CASE 
-                WHEN NEW.status = 'Flagged' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been flagged by an administrator for review.'
-                WHEN NEW.status = 'Rejected' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been rejected by an administrator.'
-            END,
-            jsonb_build_object(
-                'propertyId', NEW.id,
-                'propertyTitle', COALESCE(NEW.title, 'Untitled Property'),
-                'oldStatus', OLD.status,
-                'newStatus', NEW.status,
-                'action', 'status_change'
-            ),
-            NOW()
-        );
+        VALUES (NEW.owner_id, 'admin', CASE WHEN NEW.status = 'Flagged' THEN 'Property Flagged' WHEN NEW.status = 'Rejected' THEN 'Property Rejected' END, CASE WHEN NEW.status = 'Flagged' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been flagged by an administrator for review.' WHEN NEW.status = 'Rejected' THEN 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been rejected by an administrator.' END, jsonb_build_object('propertyId', NEW.id, 'propertyTitle', COALESCE(NEW.title, 'Untitled Property'), 'oldStatus', OLD.status, 'newStatus', NEW.status, 'action', 'status_change'), NOW());
     END IF;
-    
-    -- If property is being approved (status changed to Active), notify the owner
     IF NEW.status = 'Active' AND OLD.status != 'Active' THEN
         INSERT INTO notifications (user_id, type, title, message, data, created_at)
-        VALUES (
-            NEW.owner_id,
-            'admin',
-            'Property Approved',
-            'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been approved and is now live on the platform.',
-            jsonb_build_object(
-                'propertyId', NEW.id,
-                'propertyTitle', COALESCE(NEW.title, 'Untitled Property'),
-                'oldStatus', OLD.status,
-                'newStatus', NEW.status,
-                'action', 'status_change'
-            ),
-            NOW()
-        );
+        VALUES (NEW.owner_id, 'admin', 'Property Approved', 'Your property "' || COALESCE(NEW.title, 'Untitled Property') || '" has been approved and is now live on the platform.', jsonb_build_object('propertyId', NEW.id, 'propertyTitle', COALESCE(NEW.title, 'Untitled Property'), 'oldStatus', OLD.status, 'newStatus', NEW.status, 'action', 'status_change'), NOW());
     END IF;
-    
     RETURN NEW;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Log the error but don't fail the transaction
-        RAISE WARNING 'Error in notify_property_status_change: %', SQLERRM;
-        RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error in notify_property_status_change: %', SQLERRM;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for property status changes
+DROP TRIGGER IF EXISTS property_status_change_trigger ON public.properties;
 CREATE TRIGGER property_status_change_trigger
     AFTER UPDATE ON properties
     FOR EACH ROW
@@ -801,59 +406,92 @@ CREATE TRIGGER property_status_change_trigger
 CREATE OR REPLACE FUNCTION notify_property_deletion()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Notify the property owner when their property is deleted
     INSERT INTO notifications (user_id, type, title, message, data, created_at)
-    VALUES (
-        OLD.owner_id,
-        'admin',
-        'Property Deleted',
-        'Your property "' || COALESCE(OLD.title, 'Untitled Property') || '" has been deleted by an administrator.',
-        jsonb_build_object(
-            'propertyId', OLD.id,
-            'propertyTitle', COALESCE(OLD.title, 'Untitled Property'),
-            'action', 'deletion'
-        ),
-        NOW()
-    );
-    
+    VALUES (OLD.owner_id, 'admin', 'Property Deleted', 'Your property "' || COALESCE(OLD.title, 'Untitled Property') || '" has been deleted by an administrator.', jsonb_build_object('propertyId', OLD.id, 'propertyTitle', COALESCE(OLD.title, 'Untitled Property'), 'action', 'deletion'), NOW());
     RETURN OLD;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Log the error but don't fail the transaction
-        RAISE WARNING 'Error in notify_property_deletion: %', SQLERRM;
-        RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error in notify_property_deletion: %', SQLERRM;
+    RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for property deletions
+DROP TRIGGER IF EXISTS property_deletion_trigger ON public.properties;
 CREATE TRIGGER property_deletion_trigger
     AFTER DELETE ON properties
     FOR EACH ROW
     EXECUTE FUNCTION notify_property_deletion();
 
--- Simple test trigger for debugging
+-- Test trigger for debugging
 CREATE OR REPLACE FUNCTION test_property_deletion()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Just log the deletion without inserting notification
     RAISE NOTICE 'Property deleted: %', OLD.title;
     RETURN OLD;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE WARNING 'Error in test_property_deletion: %', SQLERRM;
-        RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error in test_property_deletion: %', SQLERRM;
+    RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
 -- Test trigger for property deletions
+DROP TRIGGER IF EXISTS test_property_deletion_trigger ON public.properties;
 CREATE TRIGGER test_property_deletion_trigger
     AFTER DELETE ON properties
     FOR EACH ROW
     EXECUTE FUNCTION test_property_deletion();
 
--- Completed on 2025-07-26 02:42:40 +06
+-- Reputation Penalty Functions
+CREATE OR REPLACE FUNCTION apply_property_flagging_penalty()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.status != 'Flagged' AND NEW.status = 'Flagged' THEN
+        UPDATE users SET reputation = GREATEST(reputation - 0.5, 0.0) WHERE id = NEW.owner_id;
+        INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (NEW.owner_id, 'system', 'Property Flagged - Reputation Penalty', 'Your property "' || NEW.title || '" has been flagged. A 0.5 point reputation penalty has been applied.', false, NOW());
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION apply_property_deletion_penalty()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE users SET reputation = GREATEST(reputation - 1.0, 0.0) WHERE id = OLD.owner_id;
+    INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (OLD.owner_id, 'system', 'Property Deleted - Reputation Penalty', 'Your property "' || OLD.title || '" has been deleted. A 1.0 point reputation penalty has been applied.', false, NOW());
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION check_user_reputation_and_suspend()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.reputation < 2.0 AND NEW.is_active = true THEN
+        UPDATE users SET is_active = false WHERE id = NEW.id;
+        INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (NEW.id, 'system', 'Account Suspended - Low Reputation', 'Your account has been suspended due to low reputation (' || NEW.reputation || '). Please contact support for assistance.', false, NOW());
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Reputation Penalty Triggers
+DROP TRIGGER IF EXISTS property_flagging_penalty_trigger ON public.properties;
+CREATE TRIGGER property_flagging_penalty_trigger
+    AFTER UPDATE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION apply_property_flagging_penalty();
+
+DROP TRIGGER IF EXISTS property_deletion_penalty_trigger ON public.properties;
+CREATE TRIGGER property_deletion_penalty_trigger
+    AFTER DELETE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION apply_property_deletion_penalty();
+
+DROP TRIGGER IF EXISTS user_reputation_check_trigger ON public.users;
+CREATE TRIGGER user_reputation_check_trigger
+    AFTER UPDATE OF reputation ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION check_user_reputation_and_suspend();
 
 --
 -- PostgreSQL database dump complete
 --
-

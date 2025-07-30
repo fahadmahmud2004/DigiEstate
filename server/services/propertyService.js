@@ -61,157 +61,182 @@ class PropertyService {
         LEFT JOIN users u ON p.owner_id = u.id
       `;
       
+      let queryParams = [];
+      
       // For admin users, don't filter by status unless specifically requested
       // For regular users, only show active properties
       if (filters.status) {
         query += ` WHERE p.status = $1`;
-        const queryParams = [filters.status];
-        let paramIndex = 2;
-        const addFilter = (clause, value) => {
-          query += ` AND ${clause}`;
-          queryParams.push(value);
-          paramIndex++;
-        };
-        
-        // Add other filters
-        this.addFiltersToQuery(query, addFilter, filters, paramIndex);
-        
-        const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
-        const countResult = await db.query(countQuery, queryParams);
-        const total = parseInt(countResult.rows[0].count, 10);
-        
-        // Add pagination
-        const page = filters.page || 1;
-        const limit = filters.limit || 12;
-        const offset = (page - 1) * limit;
-        
-        query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        queryParams.push(limit, offset);
-        
-        const result = await db.query(query, queryParams);
-        
-        return {
-          properties: result.rows.map(row => PropertyService.formatProperty(row)),
-          total,
-          page,
-          totalPages: Math.ceil(total / limit)
-        };
+        queryParams.push(filters.status);
       } else {
         // Regular user flow - only show active properties
         query += ` WHERE p.status = 'Active'`;
-        const queryParams = [];
-        let paramIndex = 1;
-        const addFilter = (clause, value) => {
-          query += ` AND ${clause}`;
-          queryParams.push(value);
-          paramIndex++;
-        };
-        
-        // Add other filters
-        this.addFiltersToQuery(query, addFilter, filters, paramIndex);
-        
-        const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
-        const countResult = await db.query(countQuery, queryParams);
-        const total = parseInt(countResult.rows[0].count, 10);
-        
-        // Add pagination
-        const page = filters.page || 1;
-        const limit = filters.limit || 12;
-        const offset = (page - 1) * limit;
-        
-        query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-        queryParams.push(limit, offset);
-        
-        const result = await db.query(query, queryParams);
-        
-        return {
-          properties: result.rows.map(row => PropertyService.formatProperty(row)),
-          total,
-          page,
-          totalPages: Math.ceil(total / limit)
-        };
       }
+      
+      // Add other filters
+      const filterResult = this.addFiltersToQuery(query, queryParams, filters);
+      query = filterResult.query;
+      let paramIndex = filterResult.paramIndex;
+      
+      // Handle sorting
+      let orderBy = 'p.created_at DESC'; // default
+      if (filters.sortBy) {
+        switch (filters.sortBy) {
+          case 'price_asc':
+            orderBy = 'p.price ASC';
+            break;
+          case 'price_desc':
+            orderBy = 'p.price DESC';
+            break;
+          case 'newest':
+            orderBy = 'p.created_at DESC';
+            break;
+          case 'popular':
+            orderBy = 'p.views DESC';
+            break;
+        }
+      }
+      
+      // Count total results
+      const countQuery = `SELECT COUNT(*) FROM (${query}) as filtered_properties`;
+      const countResult = await db.query(countQuery, queryParams);
+      const total = parseInt(countResult.rows[0].count, 10);
+      
+      // Add sorting and pagination
+      const page = parseInt(filters.page) || 1;
+      const limit = parseInt(filters.limit) || 12;
+      const offset = (page - 1) * limit;
+      
+      query += ` ORDER BY ${orderBy} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      queryParams.push(limit, offset);
+      
+      const result = await db.query(query, queryParams);
+      
+      return {
+        properties: result.rows.map(row => PropertyService.formatProperty(row)),
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      };
     } catch (err) {
       console.error(`[PropertyService] Error listing properties: ${err.message}`);
       throw new Error(`Database error while listing properties: ${err.message}`);
     }
   }
 
-  static addFiltersToQuery(query, addFilter, filters, paramIndex) {
+  static addFiltersToQuery(baseQuery, queryParams, filters) {
+    let whereConditions = [];
+    let paramIndex = queryParams.length + 1;
+    
     // Text search
     if (filters.search) {
-      addFilter(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}) OR LOWER(p.location) LIKE LOWER($${paramIndex}))`, `%${filters.search}%`);
+      whereConditions.push(`(LOWER(p.title) LIKE LOWER($${paramIndex}) OR LOWER(p.description) LIKE LOWER($${paramIndex}) OR LOWER(p.location) LIKE LOWER($${paramIndex}))`);
+      queryParams.push(`%${filters.search}%`);
+      paramIndex++;
     }
     
     // Listing type (rent/sale)
     if (filters.type) {
-      addFilter(`p.listing_type = $${paramIndex}`, filters.type === 'rent' ? 'Rent' : 'Sale');
+      whereConditions.push(`p.listing_type = $${paramIndex}`);
+      queryParams.push(filters.type === 'rent' ? 'Rent' : 'Sale');
+      paramIndex++;
     }
     
     // Price range
     if (filters.priceMin) {
-      addFilter(`p.price >= $${paramIndex}`, filters.priceMin);
+      whereConditions.push(`p.price >= $${paramIndex}`);
+      queryParams.push(parseFloat(filters.priceMin));
+      paramIndex++;
     }
     if (filters.priceMax) {
-      addFilter(`p.price <= $${paramIndex}`, filters.priceMax);
+      whereConditions.push(`p.price <= $${paramIndex}`);
+      queryParams.push(parseFloat(filters.priceMax));
+      paramIndex++;
     }
     
     // Property type (single selection)
     if (filters.propertyType) {
-      addFilter(`p.type = $${paramIndex}`, filters.propertyType);
+      whereConditions.push(`p.type = $${paramIndex}`);
+      queryParams.push(filters.propertyType);
+      paramIndex++;
     }
     
     // Bedrooms (minimum count)
     if (filters.bedrooms) {
-      addFilter(`p.bedrooms >= $${paramIndex}`, filters.bedrooms);
+      whereConditions.push(`p.bedrooms >= $${paramIndex}`);
+      queryParams.push(parseInt(filters.bedrooms));
+      paramIndex++;
     }
     
     // Bathrooms (minimum count)
     if (filters.bathrooms) {
-      addFilter(`p.bathrooms >= $${paramIndex}`, filters.bathrooms);
+      whereConditions.push(`p.bathrooms >= $${paramIndex}`);
+      queryParams.push(parseInt(filters.bathrooms));
+      paramIndex++;
     }
     
     // Amenities
     if (filters.amenities && filters.amenities.length > 0) {
       if (filters.amenities.includes('AC')) {
-        query += ` AND p.has_ac = true`;
+        whereConditions.push(`p.has_ac = true`);
       }
       if (filters.amenities.includes('Lift')) {
-        query += ` AND p.has_lift = true`;
+        whereConditions.push(`p.has_lift = true`);
       }
       if (filters.amenities.includes('Parking')) {
-        query += ` AND p.has_parking = true`;
+        whereConditions.push(`p.has_parking = true`);
       }
     }
     
     // Property type-specific filters
     if (filters.area) {
-      addFilter(`p.area >= $${paramIndex}`, filters.area);
+      whereConditions.push(`p.area >= $${paramIndex}`);
+      queryParams.push(parseFloat(filters.area));
+      paramIndex++;
     }
     
     if (filters.roadWidth) {
-      addFilter(`p.road_width >= $${paramIndex}`, filters.roadWidth);
+      whereConditions.push(`p.road_width >= $${paramIndex}`);
+      queryParams.push(parseFloat(filters.roadWidth));
+      paramIndex++;
     }
     
     if (filters.floorNumber) {
-      addFilter(`p.floor_number >= $${paramIndex}`, filters.floorNumber);
+      whereConditions.push(`p.floor_number >= $${paramIndex}`);
+      queryParams.push(parseInt(filters.floorNumber));
+      paramIndex++;
     }
     
     if (filters.totalFloors) {
-      addFilter(`p.total_floors >= $${paramIndex}`, filters.totalFloors);
+      whereConditions.push(`p.total_floors >= $${paramIndex}`);
+      queryParams.push(parseInt(filters.totalFloors));
+      paramIndex++;
     }
     
     if (filters.parkingSpaces) {
-      addFilter(`p.parking_spaces >= $${paramIndex}`, filters.parkingSpaces);
+      whereConditions.push(`p.parking_spaces >= $${paramIndex}`);
+      queryParams.push(parseInt(filters.parkingSpaces));
+      paramIndex++;
     }
     
     if (filters.isCornerPlot !== undefined) {
-      addFilter(`p.is_corner_plot = $${paramIndex}`, filters.isCornerPlot);
+      whereConditions.push(`p.is_corner_plot = $${paramIndex}`);
+      queryParams.push(filters.isCornerPlot === 'true' || filters.isCornerPlot === true);
+      paramIndex++;
     }
     
     if (filters.isFurnished !== undefined) {
-      addFilter(`p.is_furnished = $${paramIndex}`, filters.isFurnished);
+      whereConditions.push(`p.is_furnished = $${paramIndex}`);
+      queryParams.push(filters.isFurnished === 'true' || filters.isFurnished === true);
+      paramIndex++;
     }
+    
+    // Add WHERE conditions to query
+    if (whereConditions.length > 0) {
+      baseQuery += ` AND ` + whereConditions.join(' AND ');
+    }
+    
+    return { query: baseQuery, paramIndex };
   }
 
   static async get(id) {

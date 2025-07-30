@@ -22,6 +22,7 @@ interface AuthContextType {
   logout: () => void
   notifications: Notification[]
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -41,33 +42,56 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   useEffect(() => {
     const checkAuthStatus = async () => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
+      console.log('[AuthContext] Starting auth check...')
+      setIsLoading(true)
+      
+      const token = localStorage.getItem('accessToken')
+      if (token) {
         try {
           console.log('[AuthContext] Token found, fetching profile...')
           const response = await getProfile() as any
           if (response.success && response.data) {
             setUser(response.data)
-      setIsAuthenticated(true)
+            setIsAuthenticated(true)
             console.log('[AuthContext] Profile fetched, user authenticated')
           } else {
-            console.log('[AuthContext] Profile fetch failed, logging out')
-            logout()
+            console.log('[AuthContext] Profile fetch failed, clearing tokens')
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('refreshToken')
+            setUser(null)
+            setIsAuthenticated(false)
           }
         } catch (error) {
           console.error('[AuthContext] Error fetching profile:', error)
-          logout()
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('refreshToken')
+          setUser(null)
+          setIsAuthenticated(false)
         }
-    } else {
+      } else {
         console.log('[AuthContext] No token found, user not authenticated')
+        setUser(null)
         setIsAuthenticated(false)
       }
+      
+      console.log('[AuthContext] Auth check complete, setting loading to false')
+      setIsLoading(false)
     }
-    checkAuthStatus()
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('[AuthContext] Auth check timeout, forcing loading to false')
+      setIsLoading(false)
+    }, 10000) // 10 second timeout
+    
+    checkAuthStatus().finally(() => {
+      clearTimeout(timeoutId)
+    })
   }, [])
 
   const login = async (email: string, password: string) => {
@@ -150,7 +174,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     isAuthenticated,
-    notifications, // Ensure this is defined in your provider
+    isLoading,
+    notifications,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

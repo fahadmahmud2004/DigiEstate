@@ -51,7 +51,7 @@ export const logout = async () => {
 export const getProfile = async () => {
   try {
     console.log('[API] Fetching user profile');
-    const response = await api.get('/auth/profile');
+    const response = await api.get('/api/auth/profile');
     console.log('[API] Get profile response:', response.data);
     return response.data;
   } catch (error) {
