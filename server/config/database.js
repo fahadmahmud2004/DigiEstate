@@ -6,22 +6,20 @@ let db;
 const connectDB = async () => {
   try {
     db = new Client({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'DigiEstatePERN',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
     });
 
     await db.connect();
-    console.log('Connected to PostgreSQL database');
+    console.log('✅ Connected to PostgreSQL database');
 
-    // Create tables if they don't exist
-    // await createTables();
+    // await createTables(); // optional
     await createAdminUser();
 
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error('❌ Database connection failed:', error);
     throw error;
   }
 };
