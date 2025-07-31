@@ -93,8 +93,8 @@ export function MyListings() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Listings</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-3xl font-bold text-readable">My Listings</h1>
+          <p className="text-muted-readable mt-1">
             Manage your property listings and track their performance
           </p>
         </div>
@@ -107,36 +107,36 @@ export function MyListings() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-blue-600">
               {properties.filter(p => p.status === 'Active').length}
             </div>
-            <div className="text-sm text-gray-600">Active Listings</div>
+            <div className="text-sm text-muted-readable">Active Listings</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-green-600">
               {properties.reduce((sum, p) => sum + p.views, 0)}
             </div>
-            <div className="text-sm text-gray-600">Total Views</div>
+            <div className="text-sm text-muted-readable">Total Views</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-purple-600">
               {properties.reduce((sum, p) => sum + p.inquiries, 0)}
             </div>
-            <div className="text-sm text-gray-600">Total Inquiries</div>
+            <div className="text-sm text-muted-readable">Total Inquiries</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-orange-600">
               {properties.reduce((sum, p) => sum + p.bookings, 0)}
             </div>
-            <div className="text-sm text-gray-600">Total Bookings</div>
+            <div className="text-sm text-muted-readable">Total Bookings</div>
           </CardContent>
         </Card>
       </div>
@@ -145,23 +145,23 @@ export function MyListings() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-              <div className="h-48 bg-gray-200 animate-pulse rounded-t-lg"></div>
+            <Card key={i} className="bg-card-solid border border-border shadow-lg">
+              <div className="h-48 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-t-lg"></div>
               <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 animate-pulse rounded mb-2"></div>
-                <div className="h-3 bg-gray-200 animate-pulse rounded mb-4"></div>
-                <div className="h-6 bg-gray-200 animate-pulse rounded"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mb-2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mb-4"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : properties.length === 0 ? (
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-12 text-center">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <h3 className="text-xl font-semibold text-readable mb-2">
               No listings yet
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-muted-readable mb-6">
               Create your first property listing to get started
             </p>
             <Link to="/create-listing">
@@ -174,7 +174,7 @@ export function MyListings() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {properties.map((property) => (
-            <Card key={property._id} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <Card key={property._id} className="bg-card-solid border border-border shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="relative h-48 overflow-hidden rounded-t-lg">
                 <img
                   src={property.images[0] || '/placeholder-property.jpg'}
@@ -189,12 +189,12 @@ export function MyListings() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="absolute top-3 right-3 bg-white/80 backdrop-blur-sm"
+                      className="absolute top-3 right-3 bg-card-solid/80 backdrop-blur-sm border-border"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-lg">
+                  <DropdownMenuContent align="end" className="bg-card-solid/95 backdrop-blur-lg border border-border">
                     {property.status !== 'Rejected' && (
                       <Link to={`/edit-listing/${property._id}`}>
                         <DropdownMenuItem>

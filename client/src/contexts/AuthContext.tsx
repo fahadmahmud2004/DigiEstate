@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { login as apiLogin, register as apiRegister, logout as apiLogout, getProfile } from '@/api/auth'
+import { getNotifications, Notification } from '@/api/notifications'
 
 interface User {
   id: string
@@ -8,21 +9,16 @@ interface User {
   role: string
 }
 
-interface Notification {
-  id: string
-  message: string
-  type: 'success' | 'error' | 'info'
-  // Add other fields as needed
-}
-
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
   logout: () => void
   notifications: Notification[]
+  unreadCount: number
   isAuthenticated: boolean
   isLoading: boolean
+  refreshNotifications: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -44,6 +40,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await getNotifications()
+      if (response.success) {
+        setNotifications(response.notifications)
+        const unread = response.notifications.filter((n: Notification) => !n.isRead).length
+        setUnreadCount(unread)
+      }
+    } catch (error) {
+      console.error('[AuthContext] Error fetching notifications:', error)
+    }
+  }
+
+  const refreshNotifications = async () => {
+    await fetchNotifications()
+  }
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -59,6 +73,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setUser(response.data)
             setIsAuthenticated(true)
             console.log('[AuthContext] Profile fetched, user authenticated')
+            // Fetch notifications after successful authentication
+            await fetchNotifications()
           } else {
             console.log('[AuthContext] Profile fetch failed, clearing tokens')
             localStorage.removeItem('accessToken')
@@ -176,6 +192,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     isLoading,
     notifications,
+    unreadCount,
+    refreshNotifications,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

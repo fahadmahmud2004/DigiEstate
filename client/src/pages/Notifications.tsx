@@ -138,7 +138,7 @@ export function Notifications() {
       </div>
 
       <Tabs defaultValue="all" className="space-y-6">
-        <TabsList className="bg-white/80 backdrop-blur-sm">
+        <TabsList className="bg-card-solid border border-border">
           <TabsTrigger value="all">All Notifications</TabsTrigger>
           <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
           <TabsTrigger value="read">Read</TabsTrigger>
@@ -149,13 +149,13 @@ export function Notifications() {
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <Card key={i} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                  <Card key={i} className="bg-card-solid border border-border shadow-lg">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gray-200 animate-pulse rounded-full"></div>
+                        <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-full"></div>
                         <div className="flex-1">
-                          <div className="h-4 bg-gray-200 animate-pulse rounded mb-2"></div>
-                          <div className="h-3 bg-gray-200 animate-pulse rounded"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mb-2"></div>
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
                         </div>
                       </div>
                     </CardContent>
@@ -163,13 +163,13 @@ export function Notifications() {
                 ))}
               </div>
             ) : filterNotifications(tab).length === 0 ? (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-card-solid border border-border shadow-lg">
                 <CardContent className="p-12 text-center">
                   <Bell className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-xl font-semibold text-readable mb-2">
                     No {tab === 'all' ? '' : tab} notifications
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-muted-readable">
                     {tab === 'all'
                       ? "You're all caught up! No notifications to show."
                       : `You don't have any ${tab} notifications.`
@@ -182,7 +182,7 @@ export function Notifications() {
                 {filterNotifications(tab).map((notification) => (
                   <Card
                     key={notification._id}
-                    className={`bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                    className={`bg-card-solid border border-border shadow-lg hover:shadow-xl transition-all duration-300 ${
                       !notification.isRead ? 'ring-2 ring-blue-500/20' : ''
                     }`}
                   >
@@ -197,7 +197,7 @@ export function Notifications() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-semibold text-gray-900 dark:text-white">
+                                <h4 className="font-semibold text-readable">
                                   {notification.title}
                                 </h4>
                                 <Badge className={getNotificationColor(notification.type)}>
@@ -209,10 +209,10 @@ export function Notifications() {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+                              <p className="text-muted-readable text-sm mb-2">
                                 {notification.message}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-readable">
                                 {new Date(notification.createdAt).toLocaleString()}
                               </p>
                             </div>
