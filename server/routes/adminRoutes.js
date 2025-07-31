@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const AdminService = require('../services/adminService.js');
 const ComplaintService = require('../services/complaintService.js');
+const AppealService = require('../services/appealService.js');
 const { requireAdmin } = require('./middleware/adminAuth.js');
 const { getDB } = require('../config/database.js');
 
@@ -134,13 +135,12 @@ router.put('/properties/:propertyId/status', requireAdmin, async (req, res) => {
     }
     
     const updatedProperty = await AdminService.updatePropertyStatus(propertyId, status, reason);
-    const formattedProperty = AdminService.formatProperty(updatedProperty);
     
     console.log(`[ADMIN] Property ${propertyId} status updated to ${status} successfully`);
     
     res.json({
       success: true,
-      property: formattedProperty,
+      property: updatedProperty,
       message: `Property status updated to ${status} successfully`
     });
   } catch (error) {
@@ -178,56 +178,25 @@ router.delete('/properties/:propertyId', requireAdmin, async (req, res) => {
   }
 });
 
-// Test delete property without triggers
-router.delete('/properties/:propertyId/test', requireAdmin, async (req, res) => {
+// Restore property (undelete/unflag)
+router.put('/properties/:propertyId/restore', requireAdmin, async (req, res) => {
   try {
     const { propertyId } = req.params;
+    const { reason } = req.body;
     
-    console.log(`[ADMIN] TEST DELETE /api/admin/properties/${propertyId}/test`);
+    console.log(`[ADMIN] PUT /api/admin/properties/${propertyId}/restore`);
     
-    const db = getDB();
+    const updatedProperty = await AdminService.updatePropertyStatus(propertyId, 'Active', reason);
     
-    // First get the property
-    const propertyResult = await db.query(
-      'SELECT * FROM properties WHERE id = $1',
-      [propertyId]
-    );
-    
-    if (propertyResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Property not found'
-      });
-    }
-    
-    const property = propertyResult.rows[0];
-    console.log(`[ADMIN] Found property: ${property.title}`);
-    
-    // Temporarily disable triggers for testing
-    await db.query('SET session_replication_role = replica;');
-    
-    // Delete the property
-    const result = await db.query(
-      'DELETE FROM properties WHERE id = $1 RETURNING id',
-      [propertyId]
-    );
-    
-    // Re-enable triggers
-    await db.query('SET session_replication_role = DEFAULT;');
-    
-    if (result.rows.length === 0) {
-      throw new Error('Failed to delete property');
-    }
-    
-    console.log(`[ADMIN] Property ${propertyId} deleted successfully (test)`);
+    console.log(`[ADMIN] Property ${propertyId} restored successfully`);
     
     res.json({
       success: true,
-      message: `Property "${property.title}" has been deleted successfully (test)`,
-      propertyId: result.propertyId
+      property: updatedProperty,
+      message: 'Property restored successfully'
     });
   } catch (error) {
-    console.error('[ADMIN] Error deleting property (test):', error.message);
+    console.error('[ADMIN] Error restoring property:', error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -312,10 +281,10 @@ router.put('/complaints/:complaintId/status', requireAdmin, async (req, res) => 
     const formattedComplaint = {
       _id: updatedComplaint.id,
       complainant: {
-        _id: updatedComplaint.complainant
+        _id: updatedComplaint.complainant_id
       },
       target: {
-        _id: updatedComplaint.target
+        _id: updatedComplaint.target_id
       },
       targetType: updatedComplaint.target_type,
       type: updatedComplaint.type,
@@ -344,6 +313,7 @@ router.put('/complaints/:complaintId/status', requireAdmin, async (req, res) => 
   }
 });
 
+<<<<<<< HEAD
 // Get fraud alerts and security issues
 router.get('/fraud-alerts', requireAdmin, async (req, res) => {
   try {
@@ -438,6 +408,141 @@ router.get('/fraud-alerts', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('[ADMIN] Error fetching fraud alerts:', error.message);
+=======
+// Resolve complaint with property action
+router.put('/complaints/:complaintId/resolve-with-action', requireAdmin, async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const { resolution, action, reason } = req.body;
+    
+    console.log(`[ADMIN] PUT /api/admin/complaints/${complaintId}/resolve-with-action - action: ${action}`);
+    
+    if (!resolution || !action) {
+      return res.status(400).json({
+        success: false,
+        error: 'Resolution and action are required'
+      });
+    }
+
+    const result = await ComplaintService.resolveComplaintWithAction(
+      complaintId,
+      req.user.id,
+      resolution,
+      action,
+      reason || ''
+    );
+    
+    console.log(`[ADMIN] Complaint ${complaintId} resolved with action: ${action}`);
+    
+    res.json({
+      success: true,
+      complaint: result.complaint,
+      action: result.action,
+      canAppeal: result.canAppeal,
+      message: `Complaint resolved and property ${result.action} successfully`
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error resolving complaint with action:', error.message);
+>>>>>>> 52e8353 (Saving my latest work before merging)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+<<<<<<< HEAD
+module.exports = router;
+=======
+// Get all appeals with pagination
+router.get('/appeals', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    console.log(`[ADMIN] GET /api/admin/appeals - page: ${page}, limit: ${limit}`);
+    
+    const result = await AppealService.getAllAppeals(page, limit);
+    
+    // Format appeals for frontend
+    const formattedAppeals = result.appeals.map(appeal => ({
+      _id: appeal.id,
+      complaintId: appeal.complaint_id,
+      propertyId: appeal.property_id,
+      propertyTitle: appeal.property_title,
+      propertyStatus: appeal.property_status,
+      propertyOwner: {
+        _id: appeal.property_owner_id,
+        name: appeal.owner_name,
+        email: appeal.owner_email
+      },
+      complainant: {
+        _id: appeal.complainant_id,
+        name: appeal.complainant_name,
+        email: appeal.complainant_email
+      },
+      complaintType: appeal.complaint_type,
+      complaintDescription: appeal.complaint_description,
+      message: appeal.message,
+      evidencePhotos: appeal.evidence_photos || [],
+      status: appeal.status,
+      adminResponse: appeal.admin_response || '',
+      createdAt: appeal.created_at,
+      updatedAt: appeal.updated_at,
+      resolvedAt: appeal.resolved_at
+    }));
+    
+    console.log(`[ADMIN] Retrieved ${formattedAppeals.length} appeals successfully`);
+    
+    res.json({
+      success: true,
+      appeals: formattedAppeals,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching appeals:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Resolve appeal
+router.put('/appeals/:appealId/resolve', requireAdmin, async (req, res) => {
+  try {
+    const { appealId } = req.params;
+    const { decision, adminResponse } = req.body;
+
+    console.log(`[ADMIN] PUT /api/admin/appeals/${appealId}/resolve - decision: ${decision}`);
+
+    if (!decision || !['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid decision is required (approved or rejected)'
+      });
+    }
+
+    const result = await AppealService.resolveAppeal(
+      appealId,
+      req.user.id,
+      decision,
+      adminResponse || ''
+    );
+
+    console.log(`[ADMIN] Appeal ${appealId} resolved with decision: ${decision}`);
+
+    res.json({
+      success: true,
+      appeal: result.appeal,
+      decision: result.decision,
+      propertyAction: result.propertyAction,
+      message: `Appeal ${decision} successfully`
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error resolving appeal:', error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -446,3 +551,4 @@ router.get('/fraud-alerts', requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+>>>>>>> 52e8353 (Saving my latest work before merging)

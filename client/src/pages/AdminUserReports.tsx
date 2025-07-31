@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+<<<<<<< HEAD
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -67,6 +68,44 @@ export function AdminUserReports() {
     try {
       const response = await getAdminComplaints(1, 100)
       setReports(response.complaints)
+=======
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/hooks/useToast"
+import { getAdminComplaints, updateComplaintStatus, resolveComplaintWithAction, Complaint } from "@/api/complaints"
+import { getAdminAppeals, resolveAppeal, Appeal } from "@/api/appeals"
+import { AlertTriangle, Flag, Scale, CheckCircle, XCircle, Clock, Eye, ImageIcon } from "lucide-react"
+
+export function AdminUserReports() {
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [appeals, setAppeals] = useState<Appeal[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
+  const [selectedAppeal, setSelectedAppeal] = useState<Appeal | null>(null)
+  const [complaintAction, setComplaintAction] = useState("")
+  const [resolution, setResolution] = useState("")
+  const [reason, setReason] = useState("")
+  const [appealDecision, setAppealDecision] = useState("")
+  const [adminResponse, setAdminResponse] = useState("")
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [complaintsResponse, appealsResponse] = await Promise.all([
+        getAdminComplaints(1, 50),
+        getAdminAppeals(1, 50)
+      ])
+      setComplaints(complaintsResponse.complaints)
+      setAppeals(appealsResponse.appeals)
+>>>>>>> 52e8353 (Saving my latest work before merging)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -78,6 +117,7 @@ export function AdminUserReports() {
     }
   }
 
+<<<<<<< HEAD
   const handleUpdateStatus = async () => {
     if (!selectedReport || !status) return
 
@@ -101,6 +141,64 @@ export function AdminUserReports() {
       toast({
         title: "Success",
         description: `Report status updated to ${status}`,
+=======
+  const handleResolveComplaint = async () => {
+    if (!selectedComplaint || !complaintAction || !resolution) return
+
+    try {
+      const response = await resolveComplaintWithAction(
+        selectedComplaint._id,
+        resolution,
+        complaintAction,
+        reason
+      )
+
+      setComplaints(complaints.map(complaint =>
+        complaint._id === selectedComplaint._id ? response.complaint : complaint
+      ))
+
+      // Reset form
+      setSelectedComplaint(null)
+      setComplaintAction("")
+      setResolution("")
+      setReason("")
+
+      toast({
+        title: "Success",
+        description: response.message,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleResolveAppeal = async () => {
+    if (!selectedAppeal || !appealDecision) return
+
+    try {
+      const response = await resolveAppeal(
+        selectedAppeal._id,
+        appealDecision,
+        adminResponse
+      )
+
+      setAppeals(appeals.map(appeal =>
+        appeal._id === selectedAppeal._id ? { ...appeal, ...response.appeal } : appeal
+      ))
+
+      // Reset form
+      setSelectedAppeal(null)
+      setAppealDecision("")
+      setAdminResponse("")
+
+      toast({
+        title: "Success",
+        description: response.message,
+>>>>>>> 52e8353 (Saving my latest work before merging)
       })
     } catch (error: any) {
       toast({
@@ -113,6 +211,7 @@ export function AdminUserReports() {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
+<<<<<<< HEAD
       case 'open': return 'destructive'
       case 'in-progress': return 'secondary'
       case 'resolved': return 'default'
@@ -400,6 +499,363 @@ export function AdminUserReports() {
           </Table>
         </CardContent>
       </Card>
+=======
+      case 'resolved':
+      case 'approved':
+        return 'default'
+      case 'open':
+      case 'pending':
+        return 'secondary'
+      case 'rejected':
+        return 'destructive'
+      default:
+        return 'outline'
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'resolved':
+      case 'approved':
+        return <CheckCircle className="h-4 w-4" />
+      case 'rejected':
+        return <XCircle className="h-4 w-4" />
+      case 'open':
+      case 'pending':
+        return <Clock className="h-4 w-4" />
+      default:
+        return <AlertTriangle className="h-4 w-4" />
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading...</div>
+  }
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">User Reports</h1>
+        <p className="text-muted-foreground">Manage complaints and appeals from users</p>
+      </div>
+
+      <Tabs defaultValue="complaints" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="complaints" className="flex items-center gap-2">
+            <Flag className="h-4 w-4" />
+            Complaints ({complaints.filter(c => c.status === 'open').length})
+          </TabsTrigger>
+          <TabsTrigger value="appeals" className="flex items-center gap-2">
+            <Scale className="h-4 w-4" />
+            Appeals ({appeals.filter(a => a.status === 'pending').length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="complaints">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flag className="h-5 w-5" />
+                Property Complaints
+              </CardTitle>
+              <CardDescription>
+                User-reported issues with properties and listings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Complainant</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {complaints.map((complaint) => (
+                    <TableRow key={complaint._id}>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(complaint.status)} className="flex items-center gap-1">
+                          {getStatusIcon(complaint.status)}
+                          {complaint.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{complaint.type}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {complaint.target.name}
+                      </TableCell>
+                      <TableCell>{complaint.complainant.name}</TableCell>
+                      <TableCell>
+                        {new Date(complaint.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedComplaint(complaint)}
+                          disabled={complaint.status === 'resolved'}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          {complaint.status === 'resolved' ? 'View' : 'Review'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appeals">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scale className="h-5 w-5" />
+                Property Appeals
+              </CardTitle>
+              <CardDescription>
+                Appeals from property owners against complaint decisions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Original Complaint</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {appeals.map((appeal) => (
+                    <TableRow key={appeal._id}>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(appeal.status)} className="flex items-center gap-1">
+                          {getStatusIcon(appeal.status)}
+                          {appeal.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {appeal.propertyTitle}
+                      </TableCell>
+                      <TableCell>{appeal.propertyOwner.name}</TableCell>
+                      <TableCell>{appeal.complaintType}</TableCell>
+                      <TableCell>
+                        {new Date(appeal.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedAppeal(appeal)}
+                          disabled={appeal.status !== 'pending'}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          {appeal.status === 'pending' ? 'Review' : 'View'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Complaint Review Dialog */}
+      <Dialog open={!!selectedComplaint} onOpenChange={() => setSelectedComplaint(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Review Complaint</DialogTitle>
+            <DialogDescription>
+              Examine the complaint details and take appropriate action
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedComplaint && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Complaint Type</Label>
+                  <p className="text-sm text-muted-foreground">{selectedComplaint.type}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Property</Label>
+                  <p className="text-sm text-muted-foreground">{selectedComplaint.target.name}</p>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Description</Label>
+                <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                  {selectedComplaint.description}
+                </p>
+              </div>
+
+              {selectedComplaint.status === 'open' && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="action">Admin Action</Label>
+                    <Select value={complaintAction} onValueChange={setComplaintAction}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select action to take" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flag">Flag Property</SelectItem>
+                        <SelectItem value="delete">Remove Property</SelectItem>
+                        <SelectItem value="dismiss">Dismiss Complaint</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="resolution">Resolution</Label>
+                    <Textarea
+                      id="resolution"
+                      placeholder="Describe the resolution or action taken..."
+                      value={resolution}
+                      onChange={(e) => setResolution(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="reason">Reason (Optional)</Label>
+                    <Textarea
+                      id="reason"
+                      placeholder="Additional reason or explanation for the action..."
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedComplaint(null)}>
+              Close
+            </Button>
+            {selectedComplaint?.status === 'open' && (
+              <Button 
+                onClick={handleResolveComplaint}
+                disabled={!complaintAction || !resolution}
+              >
+                Take Action
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appeal Review Dialog */}
+      <Dialog open={!!selectedAppeal} onOpenChange={() => setSelectedAppeal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Review Appeal</DialogTitle>
+            <DialogDescription>
+              Review the property owner's appeal against the complaint decision
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedAppeal && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Property</Label>
+                  <p className="text-sm text-muted-foreground">{selectedAppeal.propertyTitle}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Original Complaint</Label>
+                  <p className="text-sm text-muted-foreground">{selectedAppeal.complaintType}</p>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Owner's Defense</Label>
+                <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                  {selectedAppeal.message}
+                </p>
+              </div>
+
+              {selectedAppeal.evidencePhotos.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium">Evidence Photos</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {selectedAppeal.evidencePhotos.map((photo, index) => (
+                      <img
+                        key={index}
+                        src={photo}
+                        alt={`Evidence ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-md border"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedAppeal.status === 'pending' && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="decision">Decision</Label>
+                    <Select value={appealDecision} onValueChange={setAppealDecision}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your decision" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="approved">Approve Appeal (Restore Property)</SelectItem>
+                        <SelectItem value="rejected">Reject Appeal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="admin-response">Admin Response</Label>
+                    <Textarea
+                      id="admin-response"
+                      placeholder="Provide explanation for your decision..."
+                      value={adminResponse}
+                      onChange={(e) => setAdminResponse(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {selectedAppeal.adminResponse && (
+                <div>
+                  <Label className="text-sm font-medium">Admin Response</Label>
+                  <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    {selectedAppeal.adminResponse}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedAppeal(null)}>
+              Close
+            </Button>
+            {selectedAppeal?.status === 'pending' && (
+              <Button 
+                onClick={handleResolveAppeal}
+                disabled={!appealDecision}
+              >
+                Submit Decision
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+>>>>>>> 52e8353 (Saving my latest work before merging)
     </div>
   )
 }

@@ -81,6 +81,22 @@ export function Notifications() {
         return '🛡️'
       case 'system':
         return '🔔'
+      case 'complaint_filed':
+        return '⚠️'
+      case 'complaint_resolved':
+        return '✅'
+      case 'appeal_filed':
+        return '⚖️'
+      case 'appeal_resolved':
+        return '🏛️'
+      case 'buy_request':
+        return '🏠'
+      case 'buy_approved':
+        return '✅'
+      case 'buy_rejected':
+        return '❌'
+      case 'property_sold':
+        return '💰'
       default:
         return '📢'
     }
@@ -98,6 +114,22 @@ export function Notifications() {
         return 'bg-red-600 hover:bg-red-600'
       case 'system':
         return 'bg-gray-600 hover:bg-gray-600'
+      case 'complaint_filed':
+        return 'bg-orange-600 hover:bg-orange-600'
+      case 'complaint_resolved':
+        return 'bg-green-600 hover:bg-green-600'
+      case 'appeal_filed':
+        return 'bg-blue-600 hover:bg-blue-600'
+      case 'appeal_resolved':
+        return 'bg-purple-600 hover:bg-purple-600'
+      case 'buy_request':
+        return 'bg-yellow-600 hover:bg-yellow-600'
+      case 'buy_approved':
+        return 'bg-green-600 hover:bg-green-600'
+      case 'buy_rejected':
+        return 'bg-red-600 hover:bg-red-600'
+      case 'property_sold':
+        return 'bg-emerald-600 hover:bg-emerald-600'
       default:
         return 'bg-blue-600 hover:bg-blue-600'
     }
@@ -117,31 +149,47 @@ export function Notifications() {
   const unreadCount = notifications.filter(n => !n.isRead).length
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Notifications</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Stay updated with your property activities
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-red-500 hover:bg-red-500">
-            {unreadCount} unread
-          </Badge>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-        </div>
-      </div>
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-6 w-6" />
+                Notifications
+              </CardTitle>
+              <CardDescription>
+                Stay updated with your property activities
+              </CardDescription>
+            </div>
+            <Badge variant="secondary" className="px-3 py-1">
+              {unreadCount} unread
+            </Badge>
+          </div>
+        </CardHeader>
+      </Card>
 
+<<<<<<< HEAD
       <Tabs defaultValue="all" className="space-y-6">
         <TabsList className="bg-card-solid border border-border">
           <TabsTrigger value="all">All Notifications</TabsTrigger>
           <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
           <TabsTrigger value="read">Read</TabsTrigger>
+=======
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="all">
+            <Filter className="mr-2 h-4 w-4" />
+            All Notifications
+          </TabsTrigger>
+          <TabsTrigger value="unread">
+            Unread ({unreadCount})
+          </TabsTrigger>
+          <TabsTrigger value="read">
+            Read
+          </TabsTrigger>
+>>>>>>> 52e8353 (Saving my latest work before merging)
         </TabsList>
 
         {['all', 'unread', 'read'].map((tab) => (
@@ -149,6 +197,7 @@ export function Notifications() {
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((i) => (
+<<<<<<< HEAD
                   <Card key={i} className="bg-card-solid border border-border shadow-lg">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4">
@@ -157,12 +206,20 @@ export function Notifications() {
                           <div className="h-4 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mb-2"></div>
                           <div className="h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
                         </div>
+=======
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <div className="animate-pulse space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+>>>>>>> 52e8353 (Saving my latest work before merging)
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : filterNotifications(tab).length === 0 ? (
+<<<<<<< HEAD
               <Card className="bg-card-solid border border-border shadow-lg">
                 <CardContent className="p-12 text-center">
                   <Bell className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -170,6 +227,15 @@ export function Notifications() {
                     No {tab === 'all' ? '' : tab} notifications
                   </h3>
                   <p className="text-muted-readable">
+=======
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Bell className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No {tab === 'all' ? '' : tab} notifications
+                  </h3>
+                  <p className="text-muted-foreground">
+>>>>>>> 52e8353 (Saving my latest work before merging)
                     {tab === 'all'
                       ? "You're all caught up! No notifications to show."
                       : `You don't have any ${tab} notifications.`
@@ -180,6 +246,7 @@ export function Notifications() {
             ) : (
               <div className="space-y-4">
                 {filterNotifications(tab).map((notification) => (
+<<<<<<< HEAD
                   <Card
                     key={notification._id}
                     className={`bg-card-solid border border-border shadow-lg hover:shadow-xl transition-all duration-300 ${
@@ -236,6 +303,55 @@ export function Notifications() {
                               </Button>
                             </div>
                           </div>
+=======
+                  <Card key={notification._id} className={`border-l-4 ${!notification.isRead ? 'bg-blue-50 border-l-blue-500' : 'border-l-gray-300'}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          <div className={`p-2 rounded-full text-white ${getNotificationColor(notification.type)}`}>
+                            <span className="text-sm">
+                              {getNotificationIcon(notification.type)}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold">{notification.title}</h4>
+                              <Badge variant="outline" className="text-xs">
+                                {notification.type}
+                              </Badge>
+                              {!notification.isRead && (
+                                <Badge variant="default" className="text-xs">
+                                  New
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {new Date(notification.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          {!notification.isRead && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleMarkAsRead(notification._id)}
+                            >
+                              <Check className="h-4 w-4" />
+                              Mark Read
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteNotification(notification._id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+>>>>>>> 52e8353 (Saving my latest work before merging)
                         </div>
                       </div>
                     </CardContent>

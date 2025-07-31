@@ -2,14 +2,183 @@ const { getDB } = require('../config/database.js');
 const { randomUUID } = require('crypto');
 
 class ComplaintService {
+  // Enhanced complaint creation with property-specific validation
+  static async createPropertyComplaint(complainantId, propertyId, type, description, evidence = []) {
+    try {
+      console.log(`[ComplaintService] Creating property complaint from user: ${complainantId}`);
+      const db = getDB();
+      
+      // Get property details first
+      const property = await db.query(
+        'SELECT * FROM properties WHERE id = $1',
+        [propertyId]
+      );
+
+      if (!property.rows.length) {
+        throw new Error('Property not found');
+      }
+
+      const propertyData = property.rows[0];
+
+      // Prevent owner from complaining about their own property
+      if (propertyData.owner_id === complainantId) {
+        throw new Error('Cannot file complaint against your own property');
+      }
+
+      // Create complaint
+      const complaintId = randomUUID();
+      const result = await db.query(`
+        INSERT INTO complaints (
+          id, complainant_id, target_id, target_type, type, description, evidence
+        ) VALUES ($1, $2, $3, 'property', $4, $5, $6)
+        RETURNING *
+      `, [complaintId, complainantId, propertyId, type, description, evidence]);
+
+      const complaint = result.rows[0];
+
+      // Send notification to property owner
+      await db.query(
+        `INSERT INTO notifications (user_id, type, title, message, data, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [
+          propertyData.owner_id,
+          'complaint_filed',
+          'Complaint Filed Against Your Property',
+          `A complaint has been filed against your property "${propertyData.title}" for ${type}`,
+          JSON.stringify({
+            complaintId: complaint.id,
+            propertyId: propertyId,
+            propertyTitle: propertyData.title,
+            complaintType: type,
+            complainantId: complainantId
+          })
+        ]
+      );
+
+      console.log(`[ComplaintService] Property complaint created with ID: ${complaintId}`);
+      return { success: true, complaint };
+    } catch (error) {
+      console.error(`[ComplaintService] Error creating property complaint: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Admin complaint resolution with property action
+  static async resolveComplaintWithAction(complaintId, adminId, resolution, action, reason = '') {
+    try {
+      console.log(`[ComplaintService] Resolving complaint ${complaintId} with action: ${action}`);
+      const db = getDB();
+      
+      // Get complaint details
+      const complaintResult = await db.query(`
+        SELECT c.*, p.title as property_title, p.owner_id, p.status as property_status
+        FROM complaints c
+        LEFT JOIN properties p ON c.target_id = p.id
+        WHERE c.id = $1 AND c.target_type = 'property'
+      `, [complaintId]);
+
+      if (!complaintResult.rows.length) {
+        throw new Error('Property complaint not found');
+      }
+
+      const complaint = complaintResult.rows[0];
+      
+      // Start transaction
+      await db.query('BEGIN');
+
+      try {
+        // Update complaint status
+        await db.query(`
+          UPDATE complaints 
+          SET status = 'resolved', resolution = $1, updated_at = NOW()
+          WHERE id = $2
+        `, [resolution, complaintId]);
+
+        // Perform admin action on property
+        let propertyAction = null;
+        if (action === 'flag') {
+          await db.query(
+            'UPDATE properties SET status = $1 WHERE id = $2',
+            ['Flagged', complaint.target_id]
+          );
+          propertyAction = 'flagged';
+        } else if (action === 'delete') {
+          await db.query(
+            'UPDATE properties SET status = $1 WHERE id = $2',
+            ['Rejected', complaint.target_id]
+          );
+          propertyAction = 'deleted';
+        }
+
+        // Notify complainant
+        await db.query(
+          `INSERT INTO notifications (user_id, type, title, message, data, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [
+            complaint.complainant_id,
+            'complaint_resolved',
+            'Your Complaint Has Been Resolved',
+            `Your complaint against "${complaint.property_title}" has been resolved. Action taken: ${propertyAction || 'reviewed'}`,
+            JSON.stringify({
+              complaintId: complaint.id,
+              propertyId: complaint.target_id,
+              propertyTitle: complaint.property_title,
+              action: propertyAction,
+              resolution: resolution
+            })
+          ]
+        );
+
+        // Notify property owner about complaint resolution and action
+        if (propertyAction) {
+          await db.query(
+            `INSERT INTO notifications (user_id, type, title, message, data, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              complaint.owner_id,
+              'complaint_resolved',
+              `Property ${propertyAction === 'flagged' ? 'Flagged' : 'Removed'} Due to Complaint`,
+              `Your property "${complaint.property_title}" has been ${propertyAction} following a complaint resolution. ${reason ? 'Reason: ' + reason : ''}`,
+              JSON.stringify({
+                complaintId: complaint.id,
+                propertyId: complaint.target_id,
+                propertyTitle: complaint.property_title,
+                action: propertyAction,
+                reason: reason,
+                canAppeal: true
+              })
+            ]
+          );
+        }
+
+        await db.query('COMMIT');
+        console.log(`[ComplaintService] Complaint ${complaintId} resolved with action: ${propertyAction}`);
+        
+        return { 
+          success: true, 
+          complaint: complaint,
+          action: propertyAction,
+          canAppeal: propertyAction !== null
+        };
+      } catch (error) {
+        await db.query('ROLLBACK');
+        throw error;
+      }
+    } catch (error) {
+      console.error(`[ComplaintService] Error resolving complaint: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Existing methods remain the same...
   static async create(complaintData) {
     try {
-      console.log(`[ComplaintService] Creating complaint from user: ${complaintData.complainant}`);
+      console.log(`[ComplaintService] Creating complaint from user: ${complaintData.complainant_id}`);
       const db = getDB();
       
       const id = randomUUID();
       const {
-        complainant, target, targetType, type, description, evidence = []
+        complainant_id, target_id, target_type, type, description, evidence = []
       } = complaintData;
       
       const result = await db.query(`
@@ -19,7 +188,7 @@ class ComplaintService {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, 'open', '', '', NOW(), NOW()
         ) RETURNING *`,
-        [id, complainant, target, targetType, type, description, evidence]
+        [id, complainant_id, target_id, target_type, type, description, evidence]
       );
       
       console.log(`[ComplaintService] Complaint created with ID: ${id}`);
@@ -79,6 +248,7 @@ class ComplaintService {
         throw new Error('Invalid complaint status');
       }
       
+<<<<<<< HEAD
       // First get the complaint with complainant info
       const complaintResult = await db.query(`
         SELECT c.*, u.name as complainant_name, u.email as complainant_email
@@ -94,6 +264,8 @@ class ComplaintService {
       const complaint = complaintResult.rows[0];
       
       // Update the complaint
+=======
+>>>>>>> 52e8353 (Saving my latest work before merging)
       const result = await db.query(
         `UPDATE complaints 
          SET status = $1, resolution = $2, admin_notes = $3, updated_at = NOW() 
@@ -101,6 +273,7 @@ class ComplaintService {
         [status, resolution, adminNotes, complaintId]
       );
       
+<<<<<<< HEAD
       // Send notification to the complainant
       let notificationTitle, notificationMessage;
       
@@ -146,6 +319,9 @@ class ComplaintService {
       );
       
       console.log(`[ComplaintService] Complaint ${complaintId} status updated to: ${status} with notification`);
+=======
+      console.log(`[ComplaintService] Complaint ${complaintId} status updated to: ${status}`);
+>>>>>>> 52e8353 (Saving my latest work before merging)
       return result.rows[0];
     } catch (err) {
       console.error(`[ComplaintService] Error updating complaint status: ${err.message}`);
@@ -162,7 +338,7 @@ class ComplaintService {
         SELECT c.*, 
                u1.name as complainant_name, u1.email as complainant_email,
                u2.name as target_name, u2.email as target_email,
-               p.title as property_title
+               p.title as property_title, p.owner_id, p.status as property_status
         FROM complaints c
         LEFT JOIN users u1 ON c.complainant_id = u1.id
         LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'

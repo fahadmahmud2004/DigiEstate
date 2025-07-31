@@ -1,1003 +1,1195 @@
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import {
-  MapPin, Star, Bed, Bath, Square, Car, Wind,
-  Building, Phone, Mail, MessageCircle, Calendar,
-  ArrowLeft, Heart, Share, Flag, ChevronLeft, ChevronRight,
-  Edit, Trash2, X, ZoomIn, Settings, Home
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  MapPin, 
+  Bed, 
+  Bath, 
+  Square, 
+  Car, 
+  Wifi, 
+  Wind, 
+  Home, 
+  Flag,
+  AlertTriangle,
+  Phone, 
+  Mail, 
+  MessageCircle, 
+  Calendar,
+  Star,
+  Heart,
+  Share2,
+  ArrowLeft,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  DollarSign,
+  Building,
+  Users,
+  CheckCircle,
+  Shield,
+  ImageIcon,
+  VideoIcon,
+  MapIcon,
+  Clock,
+  Scale,
+  Camera,
+  FileText,
+  Send,
+  BookOpen,
+  Info
+} from "lucide-react"
 import { getPropertyById, Property } from "@/api/properties"
-import { createBooking } from "@/api/bookings"
-import { getPropertyReviews, createPropertyReview, updateReview, deleteReview, Review, ReviewsResponse } from "@/api/reviews"
-import { sendMessage } from "@/api/messages"
-import { useToast } from "@/hooks/useToast"
+import { getUserReviews } from "@/api/reviews"
 import { useAuth } from "@/contexts/AuthContext"
+import { useToast } from "@/hooks/useToast"
+import { AppealModal } from "@/components/AppealModal"
+
+interface Review {
+  _id: string
+  reviewer: {
+    _id: string
+    name: string
+    avatar?: string
+  }
+  rating: number
+  comment: string
+  createdAt: string
+}
+
+interface BuyRequest {
+  _id: string
+  propertyId: string
+  buyerId: string
+  sellerId: string
+  offeredPrice: number
+  message?: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  createdAt: string
+}
+
+// Complaint Modal Component
+const ComplaintModal = ({ isOpen, onClose, propertyId, propertyTitle, user }) => {
+  const [complaintType, setComplaintType] = useState("")
+  const [description, setDescription] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  const complaintTypes = [
+    "Fake Listing",
+    "Price Manipulation", 
+    "False Documentation",
+    "Misleading Information",
+    "Suspicious Photos",
+    "Contact Fraud",
+    "Other"
+  ]
+
+  const handleSubmit = async () => {
+    if (!complaintType || !description.trim()) {
+      toast({
+        title: "Error",
+        description: "Please select a complaint type and provide a description",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/complaints/property', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          propertyId,
+          type: complaintType,
+          description: description.trim()
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to submit complaint')
+      }
+      
+      toast({
+        title: "Complaint Submitted",
+        description: "Your complaint has been submitted and will be reviewed by our team.",
+      })
+      
+      onClose()
+      setComplaintType("")
+      setDescription("")
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit complaint",
+        variant: "destructive"
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Flag className="h-5 w-5 text-red-500" />
+            Report Property Issue
+          </DialogTitle>
+          <DialogDescription>
+            Report this property "{propertyTitle}" if you believe it violates our policies or contains fraudulent information.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="complaint-type">Issue Type *</Label>
+            <Select value={complaintType} onValueChange={setComplaintType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select the type of issue" />
+              </SelectTrigger>
+              <SelectContent>
+                {complaintTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="description">Description *</Label>
+            <Textarea
+              id="description"
+              placeholder="Please provide details about the issue you've identified..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-[120px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              Be specific about what you found suspicious or misleading
+            </p>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={submitting || !complaintType || !description.trim()}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {submitting ? "Submitting..." : "Submit Report"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Buy Request Modal
+const BuyRequestModal = ({ isOpen, onClose, property, user }) => {
+  const [offeredPrice, setOfferedPrice] = useState("")
+  const [message, setMessage] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  const handleSubmit = async () => {
+    if (!offeredPrice || parseFloat(offeredPrice) <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid offer amount",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/buy-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          propertyId: property._id,
+          offeredPrice: parseFloat(offeredPrice),
+          message: message.trim() || `I would like to purchase your property for $${offeredPrice}`
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to submit buy request')
+      }
+      
+      toast({
+        title: "Buy Request Sent",
+        description: "Your purchase offer has been sent to the property owner.",
+      })
+      
+      onClose()
+      setOfferedPrice("")
+      setMessage("")
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit buy request",
+        variant: "destructive"
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-500" />
+            Make an Offer
+          </DialogTitle>
+          <DialogDescription>
+            Submit a purchase offer for "{property?.title}"
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="offered-price">Your Offer Amount *</Label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                id="offered-price"
+                type="number"
+                placeholder="Enter your offer"
+                value={offeredPrice}
+                onChange={(e) => setOfferedPrice(e.target.value)}
+                className="pl-10"
+                min="1"
+                step="0.01"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Listed price: ${property?.price?.toLocaleString()}
+            </p>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="message">Message (Optional)</Label>
+            <Textarea
+              id="message"
+              placeholder="Add a personal message to the seller..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={submitting || !offeredPrice}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {submitting ? "Sending..." : "Send Offer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Contact Owner Modal
+const ContactModal = ({ isOpen, onClose, property, user }) => {
+  const [message, setMessage] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  const handleSubmit = async () => {
+    if (!message.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a message",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          receiverId: property.owner._id,
+          content: message.trim(),
+          propertyId: property._id,
+          propertyTitle: property.title,
+          propertyLocation: property.location,
+          propertyPrice: property.price
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to send message')
+      }
+      
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent to the property owner.",
+      })
+      
+      onClose()
+      setMessage("")
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive"
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-blue-500" />
+            Contact Property Owner
+          </DialogTitle>
+          <DialogDescription>
+            Send a message to {property?.owner?.name} about "{property?.title}"
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="message">Your Message *</Label>
+            <Textarea
+              id="message"
+              placeholder="Hi, I'm interested in your property..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={submitting || !message.trim()}
+          >
+            {submitting ? "Sending..." : "Send Message"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function PropertyDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [property, setProperty] = useState<Property | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [bookingData, setBookingData] = useState({
-    preferredDate: '',
-    preferredTime: '',
-    message: ''
-  })
-  const [bookingLoading, setBookingLoading] = useState(false)
-  const [reviews, setReviews] = useState<ReviewsResponse>({ reviews: [], averageRating: 0, totalReviews: 0 })
-  const [reviewsLoading, setReviewsLoading] = useState(true)
-  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' })
-  const [reviewLoading, setReviewLoading] = useState(false)
-  const [editingReview, setEditingReview] = useState<Review | null>(null)
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
-  const [imageModalOpen, setImageModalOpen] = useState(false)
-  const [modalImageIndex, setModalImageIndex] = useState(0)
-  const [sendingMessage, setSendingMessage] = useState(false)
-  const [propertyNotFound, setPropertyNotFound] = useState(false)
   const { toast } = useToast()
+  
+  const [property, setProperty] = useState<Property | null>(null)
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showComplaintModal, setShowComplaintModal] = useState(false)
+  const [showAppealModal, setShowAppealModal] = useState(false)
+  const [showBuyRequestModal, setShowBuyRequestModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
+  const [savedProperties, setSavedProperties] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState("overview")
 
   useEffect(() => {
-    const fetchProperty = async () => {
+    const fetchPropertyDetails = async () => {
       if (!id) return
-
+      
       try {
-        console.log(`[PropertyDetails] Fetching property with ID: ${id}`)
-        const response = await getPropertyById(id) as any
-        console.log(`[PropertyDetails] Property response:`, response)
-        setProperty(response.property)
-        setPropertyNotFound(false)
-      } catch (error: any) {
-        console.error(`[PropertyDetails] Error fetching property:`, error)
+        setLoading(true)
+        const [propertyResponse, reviewsResponse] = await Promise.all([
+          getPropertyById(id),
+          getUserReviews(id, 'property')
+        ])
         
-        // Check if it's a 404 (property not found)
-        if (error.message?.includes('not found') || error.status === 404) {
-          setPropertyNotFound(true)
-        } else {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to load property details",
-            variant: "destructive",
-          })
-        }
+        setProperty(propertyResponse.property)
+        setReviews(reviewsResponse.reviews || [])
+      } catch (error: any) {
+        console.error('Error fetching property details:', error)
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load property details",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProperty()
+    fetchPropertyDetails()
   }, [id, toast])
 
   useEffect(() => {
-    const fetchReviews = async () => {
-      if (!id) return
+    // Load saved properties from localStorage
+    const saved = JSON.parse(localStorage.getItem('savedProperties') || '[]')
+    setSavedProperties(saved)
+  }, [])
 
+  const handleSaveProperty = () => {
+    if (!property) return
+    
+    const saved = [...savedProperties]
+    const index = saved.indexOf(property._id)
+    
+    if (index > -1) {
+      saved.splice(index, 1)
+      toast({
+        title: "Removed from Saved",
+        description: "Property removed from your saved list",
+      })
+    } else {
+      saved.push(property._id)
+      toast({
+        title: "Saved Successfully",
+        description: "Property added to your saved list",
+      })
+    }
+    
+    setSavedProperties(saved)
+    localStorage.setItem('savedProperties', JSON.stringify(saved))
+  }
+
+  const handleShare = async () => {
+    if (navigator.share) {
       try {
-        console.log(`[PropertyDetails] Fetching reviews for property ID: ${id}`)
-        const response = await getPropertyReviews(id) as any
-        console.log(`[PropertyDetails] Reviews response:`, response)
-        
-        // Ensure we have a valid reviews structure
-        if (response?.data && typeof response.data === 'object') {
-          setReviews({
-            reviews: Array.isArray(response.data.reviews) ? response.data.reviews : [],
-            averageRating: response.data.averageRating || 0,
-            totalReviews: response.data.totalReviews || 0
-          })
-        } else {
-          console.warn('[PropertyDetails] Invalid reviews response structure:', response)
-          setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
-        }
-      } catch (error) {
-        console.error(`[PropertyDetails] Error fetching reviews:`, error)
-        setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
-      } finally {
-        setReviewsLoading(false)
-      }
-    }
-
-    fetchReviews()
-  }, [id])
-
-  const handleBooking = async () => {
-    if (!property || !bookingData.preferredDate || !bookingData.preferredTime) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setBookingLoading(true)
-    try {
-      await createBooking({
-        propertyId: property._id,
-        ...bookingData
-      })
-      toast({
-        title: "Success",
-        description: "Booking request sent successfully!",
-      })
-      setBookingData({ preferredDate: '', preferredTime: '', message: '' })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send booking request",
-        variant: "destructive",
-      })
-    } finally {
-      setBookingLoading(false)
-    }
-  }
-
-  const handleReviewSubmit = async () => {
-    if (!property || !user || !reviewData.comment.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    console.log(`[PropertyDetails] Submitting review for property ${property._id}`)
-    console.log(`[PropertyDetails] Review data:`, reviewData)
-    console.log(`[PropertyDetails] User:`, user)
-
-    setReviewLoading(true)
-    try {
-      if (editingReview) {
-        console.log(`[PropertyDetails] Updating existing review: ${editingReview._id}`)
-        await updateReview(editingReview._id, reviewData)
-        toast({
-          title: "Success",
-          description: "Review updated successfully!",
+        await navigator.share({
+          title: property?.title,
+          text: `Check out this property: ${property?.title}`,
+          url: window.location.href,
         })
-      } else {
-        console.log(`[PropertyDetails] Creating new property review`)
-        const createResponse = await createPropertyReview(property._id, reviewData)
-        console.log(`[PropertyDetails] Create review response:`, createResponse)
-        toast({
-          title: "Success",
-          description: "Review submitted successfully!",
-        })
+      } catch (err) {
+        // User cancelled sharing
       }
-
-      // Refresh reviews
-      console.log(`[PropertyDetails] Refreshing reviews for property ${property._id}`)
-      const response = await getPropertyReviews(property._id) as any
-      console.log(`[PropertyDetails] Refreshed reviews response:`, response)
-      
-      // Ensure we have a valid reviews structure
-      if (response?.data && typeof response.data === 'object') {
-        setReviews({
-          reviews: Array.isArray(response.data.reviews) ? response.data.reviews : [],
-          averageRating: response.data.averageRating || 0,
-          totalReviews: response.data.totalReviews || 0
-        })
-      } else {
-        console.warn('[PropertyDetails] Invalid reviews response structure after submit:', response)
-        setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
-      }
-
-      // Reset form
-      setReviewData({ rating: 5, comment: '' })
-      setEditingReview(null)
-      setReviewDialogOpen(false)
-    } catch (error: any) {
-      console.error(`[PropertyDetails] Review submission error:`, error)
+    } else {
+      // Fallback to copying URL
+      navigator.clipboard.writeText(window.location.href)
       toast({
-        title: "Error",
-        description: error.message || "Failed to submit review",
-        variant: "destructive",
-      })
-    } finally {
-      setReviewLoading(false)
-    }
-  }
-
-  const handleDeleteReview = async (reviewId: string) => {
-    try {
-      console.log(`[PropertyDetails] Deleting review: ${reviewId}`)
-      await deleteReview(reviewId)
-      toast({
-        title: "Success",
-        description: "Review deleted successfully!",
-      })
-
-      // Refresh reviews
-      if (property) {
-        console.log(`[PropertyDetails] Refreshing reviews after deletion`)
-        const response = await getPropertyReviews(property._id) as any
-        console.log(`[PropertyDetails] Refreshed reviews after deletion:`, response)
-        setReviews(response.data)
-      }
-    } catch (error: any) {
-      console.error(`[PropertyDetails] Review deletion error:`, error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete review",
-        variant: "destructive",
+        title: "Link Copied",
+        description: "Property link copied to clipboard",
       })
     }
-  }
-
-  const startEditReview = (review: Review) => {
-    console.log(`[PropertyDetails] Starting to edit review:`, review)
-    setEditingReview(review)
-    setReviewData({ rating: review.rating, comment: review.comment })
-    setReviewDialogOpen(true)
-  }
-
-  const handleSendMessage = async () => {
-    if (!property || !user) {
-      toast({
-        title: "Error",
-        description: "Please log in to send a message",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Prevent users from messaging themselves
-    if (user.id === property.owner._id) {
-      toast({
-        title: "Error",
-        description: "You cannot send a message to yourself",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSendingMessage(true)
-    try {
-      console.log(`[PropertyDetails] Sending message to property owner: ${property.owner._id}`)
-      
-      await sendMessage({
-        receiverId: property.owner._id,
-        content: `Hi! I'm interested in your property: ${property.title}`,
-        propertyId: property._id
-      })
-
-      toast({
-        title: "Success",
-        description: "Message sent successfully! Redirecting to messages..."
-      })
-
-      // Redirect to messages page after a short delay
-      setTimeout(() => {
-        navigate('/messages')
-      }, 1500)
-
-    } catch (error: any) {
-      console.error(`[PropertyDetails] Error sending message:`, error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message",
-        variant: "destructive",
-      })
-    } finally {
-      setSendingMessage(false)
-    }
-  }
-
-  const handleManageProperty = () => {
-    navigate('/my-listings')
   }
 
   const nextImage = () => {
-    if (property && property.images.length > 1) {
+    if (property?.images && property.images.length > 1) {
       setCurrentImageIndex((prev) => (prev + 1) % property.images.length)
     }
   }
 
   const prevImage = () => {
-    if (property && property.images.length > 1) {
+    if (property?.images && property.images.length > 1) {
       setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length)
     }
   }
 
-  const openImageModal = (index: number) => {
-    setModalImageIndex(index)
-    setImageModalOpen(true)
-  }
-
-  const closeImageModal = () => {
-    setImageModalOpen(false)
-  }
-
-  // Keyboard navigation for modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!imageModalOpen) return;
-      
-      switch (e.key) {
-        case 'Escape':
-          closeImageModal();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          prevModalImage();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          nextModalImage();
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [imageModalOpen]);
-
-  const nextModalImage = () => {
-    if (property) {
-      setModalImageIndex((prev) => 
-        prev === property.images.length - 1 ? 0 : prev + 1
-      )
-    }
-  }
-
-  const prevModalImage = () => {
-    if (property) {
-      setModalImageIndex((prev) => 
-        prev === 0 ? property.images.length - 1 : prev - 1
-      )
-    }
-  }
-
-  const renderStars = (rating: number, interactive = false, onRatingChange?: (rating: number) => void) => {
-    return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-4 w-4 ${
-              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            } ${interactive ? 'cursor-pointer hover:text-yellow-400' : ''}`}
-            onClick={interactive && onRatingChange ? () => onRatingChange(star) : undefined}
-          />
-        ))}
-      </div>
-    )
-  }
+  const averageRating = reviews.length > 0 
+    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
+    : 0
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
-        <div className="h-96 bg-gray-200 animate-pulse rounded-lg"></div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="h-32 bg-gray-200 animate-pulse rounded"></div>
-            <div className="h-48 bg-gray-200 animate-pulse rounded"></div>
-          </div>
-          <div className="h-64 bg-gray-200 animate-pulse rounded"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
       </div>
     )
   }
 
-  if (!property && !loading) {
+  if (!property) {
     return (
-      <div className="text-center py-12">
-        <div className="max-w-md mx-auto">
-          {propertyNotFound ? (
-            <>
-              <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash2 className="h-10 w-10 text-red-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Property No Longer Available</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                This property has been removed by the owner or is no longer available. 
-                It may have been sold, rented out, or deleted from the platform.
-              </p>
-              <div className="space-y-3">
-                <Button onClick={() => navigate('/properties')} className="w-full">
-                  Browse Available Properties
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/messages')}
-                  className="w-full"
-                >
-                  Back to Messages
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                <Home className="h-10 w-10 text-gray-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Property Not Found</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                The property you're looking for doesn't exist or may have been moved.
-              </p>
-              <Button onClick={() => navigate('/properties')}>Back to Properties</Button>
-            </>
-          )}
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-yellow-500" />
+              Property Not Found
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              This property has been removed by the owner or is no longer available. It may have been sold, rented out, or deleted from the platform.
+            </p>
+            <Button onClick={() => navigate('/properties')} className="w-full">
+              Browse Properties
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
-
-  // TypeScript assertion: property is guaranteed to exist here due to the check above
-  if (!property) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-6">
+        {/* Back Button */}
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(-1)}
+          className="mb-6 hover:bg-white"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Properties
         </Button>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon">
-            <Heart className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <Share className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <Flag className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
-      {/* Image Gallery */}
-      <div className="relative h-96 rounded-lg overflow-hidden bg-gray-100 cursor-pointer group">
-        <img
-          src={property.images[currentImageIndex] || '/placeholder-property.jpg'}
-          alt={property.title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          onClick={() => openImageModal(currentImageIndex)}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/placeholder-property.jpg';
-          }}
-        />
-        
-        {/* Zoom indicator */}
-        <div className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <ZoomIn className="h-4 w-4" />
-        </div>
-        
-        {property.images.length > 1 && (
-          <>
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm hover:bg-white"
-              onClick={prevImage}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm hover:bg-white"
-              onClick={nextImage}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-              {property.images.map((_, index) => (
-                <button
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-                    index === currentImageIndex ? 'bg-white' : 'bg-white/50'
-                  }`}
-                  onClick={() => setCurrentImageIndex(index)}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Property Info */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-2xl mb-2">{property.title}</CardTitle>
-                  <div className="flex items-center text-gray-600 mb-4">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    <span>{property.location}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Image Gallery */}
+            <Card className="overflow-hidden">
+              <div className="relative">
+                {property.images && property.images.length > 0 ? (
+                  <div className="relative h-96 overflow-hidden">
+                    <img
+                      src={property.images[currentImageIndex]}
+                      alt={`${property.title} - Image ${currentImageIndex + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-300"
+                    />
+                    
+                    {/* Image Navigation */}
+                    {property.images.length > 1 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white"
+                          onClick={prevImage}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white"
+                          onClick={nextImage}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Image Counter */}
+                        <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                          {currentImageIndex + 1} / {property.images.length}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Status Badge */}
+                    <Badge 
+                      className={`absolute top-4 left-4 ${
+                        property.status === 'Active' ? 'bg-green-600' :
+                        property.status === 'Sold' ? 'bg-red-600' :
+                        property.status === 'Flagged' ? 'bg-yellow-600' :
+                        'bg-gray-600'
+                      }`}
+                    >
+                      {property.status}
+                    </Badge>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge className="bg-blue-600 hover:bg-blue-600">{property.type}</Badge>
-                    <Badge className="bg-green-600 hover:bg-green-600">{property.availability}</Badge>
-                    {reviews && reviews.totalReviews > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{reviews.averageRating}</span>
-                        <span className="text-sm text-gray-500">({reviews.totalReviews} reviews)</span>
+                ) : (
+                  <div className="h-96 bg-gray-200 flex items-center justify-center">
+                    <div className="text-center">
+                      <ImageIcon className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No images available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Image Thumbnails */}
+              {property.images && property.images.length > 1 && (
+                <div className="p-4 grid grid-cols-6 gap-2">
+                  {property.images.slice(0, 6).map((image, index) => (
+                    <div
+                      key={index}
+                      className={`relative h-16 cursor-pointer rounded-lg overflow-hidden transition-all ${
+                        index === currentImageIndex ? 'ring-2 ring-blue-500' : 'hover:opacity-80'
+                      }`}
+                      onClick={() => setCurrentImageIndex(index)}
+                    >
+                      <img
+                        src={image}
+                        alt={`Thumbnail ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {property.images.length > 6 && index === 5 && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-medium">
+                          +{property.images.length - 6}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Property Information Tabs */}
+            <Card>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="features">Features</TabsTrigger>
+                  <TabsTrigger value="location">Location</TabsTrigger>
+                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="mt-6">
+                  <div className="space-y-6">
+                    {/* Basic Info */}
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h1 className="text-3xl font-bold text-gray-900">{property.title}</h1>
+                          <div className="flex items-center mt-2 text-gray-600">
+                            <MapPin className="mr-1 h-4 w-4" />
+                            {property.location}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-green-600">
+                            ${property.price?.toLocaleString()}
+                          </div>
+                          <Badge variant="secondary" className="mt-1">
+                            {property.type}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Features */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                      {property.features?.bedrooms && (
+                        <div className="flex items-center space-x-2">
+                          <Bed className="h-5 w-5 text-gray-600" />
+                          <span className="font-medium">{property.features.bedrooms}</span>
+                          <span className="text-gray-600">Beds</span>
+                        </div>
+                      )}
+                      {property.features?.bathrooms && (
+                        <div className="flex items-center space-x-2">
+                          <Bath className="h-5 w-5 text-gray-600" />
+                          <span className="font-medium">{property.features.bathrooms}</span>
+                          <span className="text-gray-600">Baths</span>
+                        </div>
+                      )}
+                      {property.features?.area && (
+                        <div className="flex items-center space-x-2">
+                          <Square className="h-5 w-5 text-gray-600" />
+                          <span className="font-medium">{property.features.area}</span>
+                          <span className="text-gray-600">sqft</span>
+                        </div>
+                      )}
+                      {property.features?.parkingSpaces && (
+                        <div className="flex items-center space-x-2">
+                          <Car className="h-5 w-5 text-gray-600" />
+                          <span className="font-medium">{property.features.parkingSpaces}</span>
+                          <span className="text-gray-600">Parking</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <h3 className="text-xl font-semibold mb-3">About This Property</h3>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                        {property.description}
+                      </p>
+                    </div>
+
+                    {/* Videos Section */}
+                    {property.videos && property.videos.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                          <VideoIcon className="h-5 w-5" />
+                          Property Videos
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {property.videos.map((video, index) => (
+                            <div key={index} className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
+                              <video
+                                src={video}
+                                controls
+                                className="w-full h-full"
+                                preload="metadata"
+                              >
+                                Your browser does not support the video tag.
+                              </video>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-blue-600">
-                    ${property.price.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Features */}
-              {property.features.bedrooms && (
-                <div className="flex items-center gap-6 mb-6">
-                  <div className="flex items-center">
-                    <Bed className="h-5 w-5 mr-2 text-gray-600" />
-                    <span>{property.features.bedrooms} Bedrooms</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Bath className="h-5 w-5 mr-2 text-gray-600" />
-                    <span>{property.features.bathrooms} Bathrooms</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Square className="h-5 w-5 mr-2 text-gray-600" />
-                    <span>{property.features.area} sqft</span>
-                  </div>
-                </div>
-              )}
+                </TabsContent>
 
-              <Separator className="my-6" />
-
-              {/* Description */}
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Description</h3>
-                <p className="text-gray-600 leading-relaxed">{property.description}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Amenities */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Amenities & Features</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {property.features.hasAC && (
-                  <div className="flex items-center">
-                    <Wind className="h-4 w-4 mr-2 text-blue-600" />
-                    <span>Air Conditioning</span>
-                  </div>
-                )}
-                {property.features.hasLift && (
-                  <div className="flex items-center">
-                    <Building className="h-4 w-4 mr-2 text-blue-600" />
-                    <span>Elevator</span>
-                  </div>
-                )}
-                {property.features.hasParking && (
-                  <div className="flex items-center">
-                    <Car className="h-4 w-4 mr-2 text-blue-600" />
-                    <span>Parking</span>
-                  </div>
-                )}
-                {property.features.customFeatures.map((feature, index) => (
-                  <div key={index} className="flex items-center">
-                    <Star className="h-4 w-4 mr-2 text-blue-600" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Nearby Facilities */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Nearby Facilities</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.isArray(property.nearbyFacilities) && property.nearbyFacilities.length > 0 ? (
-                  property.nearbyFacilities.map((facility, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="font-medium">{facility.name}</span>
-                      <span className="text-sm text-gray-600">{facility.distance} km</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-gray-500 italic">No nearby facilities listed</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Reviews Section */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Reviews & Ratings</CardTitle>
-                  <CardDescription>
-                    {reviews && reviews.totalReviews > 0
-                      ? `${reviews.totalReviews} review${reviews.totalReviews > 1 ? 's' : ''} with an average rating of ${reviews.averageRating}/5`
-                      : 'No reviews yet'
-                    }
-                  </CardDescription>
-                </div>
-                {user && (
-                  <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        onClick={() => {
-                          setEditingReview(null)
-                          setReviewData({ rating: 5, comment: '' })
-                        }}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                      >
-                        Write a Review
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-white">
-                      <DialogHeader>
-                        <DialogTitle>{editingReview ? 'Edit Review' : 'Write a Review'}</DialogTitle>
-                        <DialogDescription>
-                          Share your experience with this property
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Rating</Label>
-                          {renderStars(reviewData.rating, true, (rating) =>
-                            setReviewData(prev => ({ ...prev, rating }))
+                <TabsContent value="features" className="mt-6">
+                  <div className="space-y-6">
+                    {/* Property Details */}
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4">Property Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          {property.features?.floorNumber && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Floor Number:</span>
+                              <span className="font-medium">{property.features.floorNumber}</span>
+                            </div>
                           )}
-                        </div>
-                        <div>
-                          <Label htmlFor="comment">Comment</Label>
-                          <Textarea
-                            id="comment"
-                            placeholder="Share your thoughts about this property..."
-                            value={reviewData.comment}
-                            onChange={(e) => setReviewData(prev => ({ ...prev, comment: e.target.value }))}
-                            rows={4}
-                          />
-                        </div>
-                        <Button
-                          onClick={handleReviewSubmit}
-                          disabled={reviewLoading}
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
-                        >
-                          {reviewLoading ? "Submitting..." : editingReview ? "Update Review" : "Submit Review"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {reviewsLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                      <div className="h-16 bg-gray-200 rounded"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : reviews && reviews.reviews && reviews.reviews.length > 0 ? (
-                <div className="space-y-6">
-                  {reviews.reviews.map((review) => (
-                    <div key={review._id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={review.reviewer.avatar} />
-                            <AvatarFallback className="bg-blue-600 text-white text-sm">
-                              {review.reviewer.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-sm">{review.reviewer.name}</div>
-                            <div className="flex items-center gap-2">
-                              {renderStars(review.rating)}
-                              <span className="text-xs text-gray-500">
-                                {new Date(review.createdAt).toLocaleDateString()}
+                          {property.features?.totalFloors && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Total Floors:</span>
+                              <span className="font-medium">{property.features.totalFloors}</span>
+                            </div>
+                          )}
+                          {property.features?.roadWidth && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Road Width:</span>
+                              <span className="font-medium">{property.features.roadWidth} ft</span>
+                            </div>
+                          )}
+                          {property.features?.isCornerPlot !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Corner Plot:</span>
+                              <span className="font-medium">
+                                {property.features.isCornerPlot ? 'Yes' : 'No'}
                               </span>
                             </div>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Property Type:</span>
+                            <span className="font-medium">{property.type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Listing Type:</span>
+                            <span className="font-medium">{property.listingType || 'Sale'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Availability:</span>
+                            <span className="font-medium">{property.availability || 'Available'}</span>
                           </div>
                         </div>
-                        {user && user.id === review.reviewerId && (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditReview(review)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteReview(review._id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                      </div>
+                    </div>
+
+                    {/* Amenities */}
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4">Amenities & Features</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {property.features?.hasAC && (
+                          <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                            <Wind className="h-4 w-4 text-green-600" />
+                            <span className="text-sm">Air Conditioning</span>
+                          </div>
+                        )}
+                        {property.features?.hasLift && (
+                          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                            <Building className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm">Elevator</span>
+                          </div>
+                        )}
+                        {property.features?.isFurnished && (
+                          <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
+                            <Home className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm">Furnished</span>
+                          </div>
+                        )}
+                        {property.features?.hasParking && (
+                          <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg">
+                            <Car className="h-4 w-4 text-orange-600" />
+                            <span className="text-sm">Parking Available</span>
                           </div>
                         )}
                       </div>
-                      <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>
+                      
+                      {/* Custom Features */}
+                      {property.features?.customFeatures && property.features.customFeatures.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-2">Additional Features:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {property.features.customFeatures.map((feature, index) => (
+                              <Badge key={index} variant="outline">
+                                {feature}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Star className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>No reviews yet. Be the first to review this property!</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Owner Info */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Property Owner</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 mb-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={property.owner.avatar} />
-                  <AvatarFallback className="bg-blue-600 text-white">
-                    {property.owner.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="font-semibold">{property.owner.name}</h4>
-                  <div className="flex items-center text-yellow-500">
-                    <Star className="h-4 w-4 fill-current mr-1" />
-                    <span className="text-sm">{property.owner.reputation} rating</span>
+                    {/* Nearby Facilities */}
+                    {property.nearbyFacilities && Array.isArray(property.nearbyFacilities) && property.nearbyFacilities.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">Nearby Facilities</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {property.nearbyFacilities.map((facility, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                              <span className="font-medium">{facility.name}</span>
+                              <span className="text-sm text-gray-600">{facility.distance}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="location" className="mt-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <MapIcon className="h-5 w-5" />
+                        Property Location
+                      </h3>
+                      <div className="bg-gray-100 p-6 rounded-lg text-center">
+                        <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-lg font-medium text-gray-700">{property.location}</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Interactive map integration would be implemented here
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="reviews" className="mt-6">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-semibold">Property Reviews</h3>
+                      {reviews.length > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center">
+                            <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                            <span className="ml-1 font-semibold">{averageRating.toFixed(1)}</span>
+                          </div>
+                          <span className="text-sm text-gray-500">({reviews.length} reviews)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {reviews.length > 0 ? (
+                      <div className="space-y-4">
+                        {reviews.map((review) => (
+                          <div key={review._id} className="border-b border-gray-100 pb-6 last:border-b-0">
+                            <div className="flex items-start space-x-4">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={review.reviewer.avatar} />
+                                <AvatarFallback>
+                                  {review.reviewer.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-medium">{review.reviewer.name}</h4>
+                                  <div className="flex items-center space-x-1">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`h-4 w-4 ${
+                                          i < review.rating
+                                            ? 'fill-yellow-400 text-yellow-400'
+                                            : 'text-gray-300'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                <p className="text-gray-700 mb-2">{review.comment}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(review.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Star className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-500 text-lg">No reviews yet</p>
+                        <p className="text-gray-400 text-sm">Be the first to review this property!</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Property Owner Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Property Owner
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4 mb-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={property.owner?.avatar} />
+                    <AvatarFallback className="text-lg">
+                      {property.owner?.name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-semibold text-lg">{property.owner?.name || 'Property Owner'}</h3>
+                    <div className="flex items-center space-x-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm font-medium">{property.owner?.reputation || 4.5}</span>
+                      <span className="text-sm text-gray-500">rating</span>
+                    </div>
+                    {property.owner?.phone && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        <Phone className="h-3 w-3 inline mr-1" />
+                        {property.owner.phone}
+                      </p>
+                    )}
                   </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <Phone className="h-4 w-4 mr-2" />
-                  {property.owner.phone}
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Mail className="h-4 w-4 mr-2" />
-                  {property.owner.email}
-                </Button>
-                <Button 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  onClick={handleSendMessage}
-                  disabled={sendingMessage || !user || (user && user.id === property.owner._id)}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  {sendingMessage 
-                    ? "Sending..." 
-                    : (user && user.id === property.owner._id)
-                    ? "Your Property"
-                    : "Send Message"
-                  }
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Booking */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>
-                {user && user.id === property.owner._id ? 'Property Management' : 'Book Viewing'}
-              </CardTitle>
-              <CardDescription>
-                {user && user.id === property.owner._id 
-                  ? 'Manage your property listing' 
-                  : 'Schedule a visit to this property'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user && user.id === property.owner._id ? (
-                // Owner view - Manage Property
-                <Button 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  onClick={handleManageProperty}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Manage Your Property
-                </Button>
-              ) : (
-                // Non-owner view - Book Viewing
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Book Now
+                {user && user.id !== property.owner._id ? (
+                  <div className="space-y-3">
+                    <Button 
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      onClick={() => setShowContactModal(true)}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Send Message
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-white">
-                    <DialogHeader>
-                      <DialogTitle>Book Property Viewing</DialogTitle>
-                      <DialogDescription>
-                        Fill in your preferred date and time for viewing this property.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="date">Preferred Date</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={bookingData.preferredDate}
-                          onChange={(e) => setBookingData(prev => ({ ...prev, preferredDate: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="time">Preferred Time</Label>
-                        <Input
-                          id="time"
-                          type="time"
-                          value={bookingData.preferredTime}
-                          onChange={(e) => setBookingData(prev => ({ ...prev, preferredTime: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="message">Message (Optional)</Label>
-                        <Textarea
-                          id="message"
-                          placeholder="Any specific requirements or questions..."
-                          value={bookingData.message}
-                          onChange={(e) => setBookingData(prev => ({ ...prev, message: e.target.value }))}
-                        />
-                      </div>
-                      <Button
-                        onClick={handleBooking}
-                        disabled={bookingLoading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                    
+                    {property.listingType !== 'Rent' && property.status === 'Active' && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-green-200 text-green-700 hover:bg-green-50"
+                        onClick={() => setShowBuyRequestModal(true)}
                       >
-                        {bookingLoading ? "Sending..." : "Send Booking Request"}
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Make Offer
                       </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </CardContent>
-          </Card>
+                    )}
+                    
+                    <Button variant="outline" className="w-full">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Schedule Visit
+                    </Button>
+                  </div>
+                ) : user && user.id === property.owner._id ? (
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <Shield className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                    <p className="text-sm text-blue-800 font-medium">This is your property</p>
+                  </div>
+                ) : (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Sign in to contact the owner</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2 w-full" 
+                      onClick={() => navigate('/login')}
+                    >
+                      Sign In
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Property Stats */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Property Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Views</span>
-                  <span className="font-semibold">{property.views}</span>
+            {/* Action Buttons */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleSaveProperty}
+                  >
+                    <Heart className={`mr-2 h-4 w-4 ${
+                      savedProperties.includes(property._id) ? 'fill-red-500 text-red-500' : ''
+                    }`} />
+                    {savedProperties.includes(property._id) ? 'Saved' : 'Save Property'}
+                  </Button>
+                  
+                  <Button variant="outline" className="w-full" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Share Property
+                  </Button>
+                  
+                  {/* Complaint Button - Only show for non-owners and logged-in users */}
+                  {user && property && user.id !== property.owner._id && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowComplaintModal(true)}
+                      className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Flag className="mr-2 h-4 w-4" />
+                      Report Issue
+                    </Button>
+                  )}
+
+                  {/* Appeal Button - Only show for property owners when property is flagged/rejected */}
+                  {user && property && user.id === property.owner._id && 
+                   (property.status === 'Flagged' || property.status === 'Rejected') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowAppealModal(true)}
+                      className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <Scale className="mr-2 h-4 w-4" />
+                      Appeal Decision
+                    </Button>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Inquiries</span>
-                  <span className="font-semibold">{property.inquiries}</span>
+              </CardContent>
+            </Card>
+
+            {/* Property Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Property Statistics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">Views</span>
+                    </div>
+                    <span className="font-medium">{property.views || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">Inquiries</span>
+                    </div>
+                    <span className="font-medium">{property.inquiries || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">Bookings</span>
+                    </div>
+                    <span className="font-medium">{property.bookings || 0}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">Listed</span>
+                    </div>
+                    <span className="font-medium text-sm">
+                      {new Date(property.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Bookings</span>
-                  <span className="font-semibold">{property.bookings}</span>
+              </CardContent>
+            </Card>
+
+            {/* Safety Notice */}
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-amber-800 mb-1">Safety First</h4>
+                    <p className="text-sm text-amber-700">
+                      Always verify property details in person. Never transfer money without proper documentation.
+                    </p>
+                  </div>
                 </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Listed</span>
-                  <span className="font-semibold">
-                    {new Date(property.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
-      {/* Image Modal */}
-      <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
-        <DialogContent className="max-w-[40vw] max-h-[40vh] p-0 bg-black/95 border-0">
-          <div className="relative w-full h-full">
-            {/* Close button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70"
-              onClick={closeImageModal}
-            >
-              <X className="h-6 w-6" />
-            </Button>
+      {/* Modals */}
+      <ComplaintModal
+        isOpen={showComplaintModal}
+        onClose={() => setShowComplaintModal(false)}
+        propertyId={property?._id}
+        propertyTitle={property?.title}
+        user={user}
+      />
 
-            {/* Main image */}
-            <div className="relative w-full h-full flex items-center justify-center p-2">
-              <img
-                src={property.images[modalImageIndex] || '/placeholder-property.jpg'}
-                alt={`${property.title} - Image ${modalImageIndex + 1}`}
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/placeholder-property.jpg';
-                }}
-              />
-            </div>
+      {showAppealModal && (
+        <AppealModal
+          isOpen={showAppealModal}
+          onClose={() => setShowAppealModal(false)}
+          complaintId="" // You'll need to pass the actual complaint ID
+          propertyId={property._id}
+          propertyTitle={property.title}
+          complaintType="Property Action" // You'll need to pass the actual complaint type
+        />
+      )}
 
-            {/* Navigation buttons */}
-            {property.images.length > 1 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-white/20"
-                  onClick={prevModalImage}
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-white/20"
-                  onClick={nextModalImage}
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-              </>
-            )}
+      <BuyRequestModal
+        isOpen={showBuyRequestModal}
+        onClose={() => setShowBuyRequestModal(false)}
+        property={property}
+        user={user}
+      />
 
-            {/* Image counter */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full">
-              {modalImageIndex + 1} of {property.images.length}
-            </div>
-
-            {/* Thumbnail strip */}
-            {property.images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 bg-black/50 p-2 rounded-lg max-w-[80vw] overflow-x-auto">
-                {property.images.map((image, index) => (
-                  <button
-                    key={index}
-                    className={`w-16 h-12 rounded overflow-hidden border-2 transition-all duration-200 flex-shrink-0 ${
-                      index === modalImageIndex 
-                        ? 'border-white scale-110' 
-                        : 'border-transparent hover:border-white/50'
-                    }`}
-                    onClick={() => setModalImageIndex(index)}
-                  >
-                    <img
-                      src={image}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/placeholder-property.jpg';
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        property={property}
+        user={user}
+      />
     </div>
   )
 }

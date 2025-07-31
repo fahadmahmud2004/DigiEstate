@@ -210,7 +210,41 @@ class NotificationService {
     return await this.createNotification(notificationData);
   }
 
-  // Helper methods for notification content
+  // Create notification for complaint events
+  static async createComplaintNotification(userId, type, complaintData) {
+    const notificationData = {
+      userId,
+      type: type, // 'complaint_filed', 'complaint_resolved'
+      title: this.getComplaintNotificationTitle(type),
+      message: this.getComplaintNotificationMessage(type, complaintData),
+      data: { 
+        complaintId: complaintData.complaintId, 
+        propertyId: complaintData.propertyId,
+        action: complaintData.action 
+      }
+    };
+
+    return await this.createNotification(notificationData);
+  }
+
+  // Create notification for appeal events
+  static async createAppealNotification(userId, type, appealData) {
+    const notificationData = {
+      userId,
+      type: type, // 'appeal_filed', 'appeal_resolved'
+      title: this.getAppealNotificationTitle(type),
+      message: this.getAppealNotificationMessage(type, appealData),
+      data: { 
+        appealId: appealData.appealId, 
+        propertyId: appealData.propertyId,
+        decision: appealData.decision 
+      }
+    };
+
+    return await this.createNotification(notificationData);
+  }
+
+  // Helper methods for booking notifications
   static getBookingNotificationTitle(type) {
     switch (type) {
       case 'accepted': return 'Booking Request Accepted';
@@ -228,6 +262,46 @@ class NotificationService {
       case 'cancelled': return `Your booking for ${bookingData.propertyTitle} has been cancelled.`;
       case 'new': return `You have a new booking request for ${bookingData.propertyTitle}.`;
       default: return `Your booking for ${bookingData.propertyTitle} has been updated.`;
+    }
+  }
+
+  // Helper methods for complaint notifications
+  static getComplaintNotificationTitle(type) {
+    switch (type) {
+      case 'complaint_filed': return 'Complaint Filed Against Your Property';
+      case 'complaint_resolved': return 'Complaint Resolved';
+      default: return 'Complaint Update';
+    }
+  }
+
+  static getComplaintNotificationMessage(type, data) {
+    switch (type) {
+      case 'complaint_filed': 
+        return `A complaint has been filed against your property "${data.propertyTitle}" for ${data.complaintType}`;
+      case 'complaint_resolved': 
+        return `Your complaint against "${data.propertyTitle}" has been resolved. Action taken: ${data.action}`;
+      default: 
+        return `Your complaint has been updated.`;
+    }
+  }
+
+  // Helper methods for appeal notifications
+  static getAppealNotificationTitle(type) {
+    switch (type) {
+      case 'appeal_filed': return 'New Appeal Filed';
+      case 'appeal_resolved': return 'Appeal Decision';
+      default: return 'Appeal Update';
+    }
+  }
+
+  static getAppealNotificationMessage(type, data) {
+    switch (type) {
+      case 'appeal_filed': 
+        return `Property owner has filed an appeal for "${data.propertyTitle}"`;
+      case 'appeal_resolved': 
+        return `Appeal for "${data.propertyTitle}" has been ${data.decision}. ${data.decision === 'approved' ? 'Property has been restored.' : ''}`;
+      default: 
+        return `Appeal status has been updated.`;
     }
   }
 }

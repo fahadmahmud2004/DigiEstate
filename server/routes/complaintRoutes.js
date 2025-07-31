@@ -3,24 +3,62 @@ const router = express.Router();
 const ComplaintService = require('../services/complaintService.js');
 const { requireUser } = require('./middleware/auth.js');
 
-// Create a new complaint
+// Create a property complaint
+router.post('/property', requireUser, async (req, res) => {
+  try {
+    const { propertyId, type, description, evidence } = req.body;
+
+    console.log(`[COMPLAINT] POST /api/complaints/property - Creating complaint from user ${req.user.id}`);
+
+    if (!propertyId || !type || !description) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: propertyId, type, description'
+      });
+    }
+
+    const result = await ComplaintService.createPropertyComplaint(
+      req.user.id,
+      propertyId,
+      type,
+      description,
+      evidence || []
+    );
+
+    console.log(`[COMPLAINT] Property complaint created successfully`);
+
+    res.status(201).json({
+      success: true,
+      complaint: result.complaint,
+      message: 'Complaint submitted successfully. The property owner and admin have been notified.'
+    });
+  } catch (error) {
+    console.error('[COMPLAINT] Error creating property complaint:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Create a general complaint (keep existing functionality)
 router.post('/', requireUser, async (req, res) => {
   try {
-    const { target, targetType, type, description, evidence } = req.body;
+    const { target_id, target_type, type, description, evidence } = req.body;
 
     console.log(`[COMPLAINT] POST /api/complaints - Creating complaint from user ${req.user.id}`);
 
-    if (!target || !targetType || !type || !description) {
+    if (!target_id || !target_type || !type || !description) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: target, targetType, type, description'
+        error: 'Missing required fields: target_id, target_type, type, description'
       });
     }
 
     const complaintData = {
-      complainant: req.user.id.toString(),
-      target,
-      targetType,
+      complainant_id: req.user.id,
+      target_id,
+      target_type,
       type,
       description,
       evidence: evidence || []
@@ -35,10 +73,10 @@ router.post('/', requireUser, async (req, res) => {
       complaint: {
         _id: complaint.id,
         complainant: {
-          _id: complaint.complainant
+          _id: complaint.complainant_id
         },
         target: {
-          _id: complaint.target
+          _id: complaint.target_id
         },
         targetType: complaint.target_type,
         type: complaint.type,
@@ -73,18 +111,18 @@ router.get('/my-complaints', requireUser, async (req, res) => {
     
     // Filter complaints by current user
     const userComplaints = result.complaints.filter(
-      complaint => complaint.complainant === req.user.id.toString()
+      complaint => complaint.complainant_id === req.user.id
     );
 
     const formattedComplaints = userComplaints.map(complaint => ({
       _id: complaint.id,
       complainant: {
-        _id: complaint.complainant,
+        _id: complaint.complainant_id,
         name: complaint.complainant_name || 'You',
         email: complaint.complainant_email || ''
       },
       target: {
-        _id: complaint.target,
+        _id: complaint.target_id,
         name: complaint.target_name || complaint.property_title || 'Unknown',
         email: complaint.target_email || ''
       },
