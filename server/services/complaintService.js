@@ -14,7 +14,7 @@ class ComplaintService {
       
       const result = await db.query(`
         INSERT INTO complaints (
-          id, complainant, target, target_type, type, description, evidence,
+          id, complainant_id, target_id, target_type, type, description, evidence,
           status, resolution, admin_notes, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, 'open', '', '', NOW(), NOW()
@@ -48,9 +48,9 @@ class ComplaintService {
                u2.name as target_name, u2.email as target_email,
                p.title as property_title
         FROM complaints c
-        LEFT JOIN users u1 ON c.complainant = u1.id::text
-        LEFT JOIN users u2 ON c.target = u2.id::text AND c.target_type = 'user'
-        LEFT JOIN properties p ON c.target = p.id AND c.target_type = 'property'
+        LEFT JOIN users u1 ON c.complainant_id = u1.id
+        LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
+        LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
         ORDER BY c.created_at DESC 
         LIMIT $1 OFFSET $2
       `, [limit, offset]);
@@ -83,7 +83,7 @@ class ComplaintService {
       const complaintResult = await db.query(`
         SELECT c.*, u.name as complainant_name, u.email as complainant_email
         FROM complaints c
-        LEFT JOIN users u ON c.complainant = u.id::text
+        LEFT JOIN users u ON c.complainant_id = u.id
         WHERE c.id = $1
       `, [complaintId]);
       
@@ -130,7 +130,7 @@ class ComplaintService {
         `INSERT INTO notifications (user_id, type, title, message, data, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
-          complaint.complainant,
+          complaint.complainant_id,
           'admin',
           notificationTitle,
           notificationMessage,
@@ -164,9 +164,9 @@ class ComplaintService {
                u2.name as target_name, u2.email as target_email,
                p.title as property_title
         FROM complaints c
-        LEFT JOIN users u1 ON c.complainant = u1.id::text
-        LEFT JOIN users u2 ON c.target = u2.id::text AND c.target_type = 'user'
-        LEFT JOIN properties p ON c.target = p.id AND c.target_type = 'property'
+        LEFT JOIN users u1 ON c.complainant_id = u1.id
+        LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
+        LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
         WHERE c.id = $1
       `, [id]);
       

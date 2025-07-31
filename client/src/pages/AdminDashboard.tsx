@@ -30,6 +30,7 @@ import {
   Building2
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
+import { useNavigate } from "react-router-dom"
 
 export function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -42,6 +43,7 @@ export function AdminDashboard() {
   const [adminNotes, setAdminNotes] = useState("")
   const { toast } = useToast()
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   // Mock data for alerts (in real app, these would come from API)
   const urgentAlerts = {
@@ -257,7 +259,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-red-300 text-red-700 hover:bg-red-200"
+                onClick={() => navigate('/admin/fraud-alerts')}
+              >
                 Review
               </Button>
             </div>
@@ -276,7 +283,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-red-300 text-red-700 hover:bg-red-200"
+                onClick={() => navigate('/admin/fraud-alerts')}
+              >
                 Review
               </Button>
             </div>
@@ -295,7 +307,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-red-300 text-red-700 hover:bg-red-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-red-300 text-red-700 hover:bg-red-200"
+                onClick={() => navigate('/admin/fraud-alerts')}
+              >
                 Review
               </Button>
             </div>
@@ -325,7 +342,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-orange-300 text-orange-700 hover:bg-orange-200"
+                onClick={() => navigate('/admin/user-reports')}
+              >
                 Review
               </Button>
             </div>
@@ -344,7 +366,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-orange-300 text-orange-700 hover:bg-orange-200"
+                onClick={() => navigate('/admin/user-reports')}
+              >
                 Review
               </Button>
             </div>
@@ -375,7 +402,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-blue-300 text-blue-700 hover:bg-blue-200"
+                onClick={() => navigate('/admin/proactive-reviews')}
+              >
                 Review
               </Button>
             </div>
@@ -394,7 +426,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-blue-300 text-blue-700 hover:bg-blue-200"
+                onClick={() => navigate('/admin/proactive-reviews')}
+              >
                 Review
               </Button>
             </div>
@@ -413,7 +450,12 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-200">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-blue-300 text-blue-700 hover:bg-blue-200"
+                onClick={() => navigate('/admin/proactive-reviews')}
+              >
                 Review
               </Button>
             </div>

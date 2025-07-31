@@ -7,6 +7,7 @@ const UserService = require('../services/userService.js');
 const PropertyService = require('../services/propertyService.js');
 const BookingService = require('../services/bookingService.js');
 const { requireUser } = require('./middleware/auth.js');
+const { comparePassword } = require('../utils/password.js');
 
 // --- Multer Configuration ---
 const uploadDir = 'uploads/';
@@ -115,6 +116,65 @@ router.put('/', requireUser, upload.single('avatar'), async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update profile'
+    });
+  }
+});
+
+// Change password
+router.put('/change-password', requireUser, async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { currentPassword, newPassword } = req.body;
+
+    console.log(`[PROFILE] PUT /api/profile/change-password - Password change request for user: ${id}`);
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Current password and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'New password must be at least 6 characters long'
+      });
+    }
+
+    // Get current user to verify current password
+    const user = await UserService.get(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      console.log(`[PROFILE] Invalid current password for user: ${id}`);
+      return res.status(401).json({
+        success: false,
+        error: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
+    await UserService.update(id, { password: newPassword });
+
+    console.log(`[PROFILE] Password changed successfully for user: ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('[PROFILE] Error changing password:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to change password'
     });
   }
 });

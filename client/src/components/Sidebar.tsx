@@ -33,10 +33,9 @@ const navigation = [
 const adminNavigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: Activity },
   { name: "All Properties", href: "/admin/properties", icon: Building2 },
-  { name: "All Users", href: "/admin/users", icon: Users },
-  { name: "Appeals", href: "/admin/appeals", icon: Gavel },
-  { name: "Reports", href: "/admin/reports", icon: FileText },
-  { name: "Seed Database", href: "/admin/seed", icon: Database },
+  { name: "Fraud Alerts", href: "/admin/fraud-alerts", icon: Shield },
+  { name: "User Reports", href: "/admin/user-reports", icon: FileText },
+  { name: "Proactive Reviews", href: "/admin/proactive-reviews", icon: Users },
 ]
 
 export function Sidebar() {
