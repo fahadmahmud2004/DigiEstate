@@ -272,7 +272,7 @@ router.post('/ai-chat', requireUser, async (req, res) => {
               role: 'user',
               parts: [
                 {
-                  text: `You are a helpful AI assistant for a digital real estate platform called DigiEstate. You help users with property-related questions, market insights, buying/selling advice, and general real estate inquiries. Be friendly, professional, and knowledgeable about real estate topics.
+                  text: `You are a helpful AI assistant for a digital real estate platform called DigiEstate created by Fahad and Adib. Give shorter precise and plain text to the user. Be friendly, professional, and knowledgeable about real estate topics. Always respond in Bengali Language MUST.
 
 Previous conversation context:
 ${conversationContext.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
