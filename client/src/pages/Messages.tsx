@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { Send, Paperclip, Search, MoreVertical, Plus, X } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Send, Paperclip, Search, MoreVertical, Plus, X, Upload, FileText, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getConversations, getMessages, sendMessage, markConversationAsRead, Conversation, Message } from "@/api/messages"
-import { getUsers, searchUsers, User } from "@/api/users"
+import { getConversations, getMessages, sendMessage, markConversationAsRead, sendMessageWithFiles, downloadMessageFile, Conversation, Message } from "@/api/messages"
+import { searchUsers, User } from "@/api/users"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -23,6 +23,9 @@ export function Messages() {
   const [users, setUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { user: currentUser } = useAuth()
 
@@ -36,7 +39,7 @@ export function Messages() {
         if (response.conversations.length > 0) {
           setSelectedConversation(response.conversations[0]._id)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching conversations:", error)
         toast({
           title: "Error",
@@ -67,7 +70,7 @@ export function Messages() {
               ? { ...conv, unreadCount: 0 }
               : conv
           ))
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error fetching messages:", error)
           toast({
             title: "Error",
@@ -82,23 +85,41 @@ export function Messages() {
   }, [selectedConversation, toast])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation || !currentUser) return
+    if ((!newMessage.trim() && !selectedFiles) || !selectedConversation || !currentUser) return
 
     setSendingMessage(true)
+    setUploadingFiles(!!selectedFiles)
+
     try {
-      console.log("Sending message:", newMessage)
+      console.log("Sending message:", newMessage, "with files:", selectedFiles)
       const conversation = conversations.find(c => c._id === selectedConversation)
       const receiverId = conversation?.participants.find(p => p._id !== currentUser.id)?._id
 
       if (receiverId) {
-        const response = await sendMessage({
-          receiverId,
-          content: newMessage.trim()
-        }) as any
+        let response: any
+
+        if (selectedFiles && selectedFiles.length > 0) {
+          // Send message with files
+          response = await sendMessageWithFiles({
+            receiverId,
+            content: newMessage.trim() || "(File attachment)",
+            files: selectedFiles
+          })
+        } else {
+          // Send regular message
+          response = await sendMessage({
+            receiverId,
+            content: newMessage.trim()
+          })
+        }
 
         console.log("Message sent:", response.message)
         setMessages(prev => [...prev, response.message])
         setNewMessage("")
+        setSelectedFiles(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""
+        }
 
         // Update conversation list with new last message
         setConversations(prev => prev.map(conv =>
@@ -113,10 +134,10 @@ export function Messages() {
 
         toast({
           title: "Success",
-          description: "Message sent successfully"
+          description: selectedFiles ? "Message and files sent successfully" : "Message sent successfully"
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error)
       toast({
         title: "Error",
@@ -125,6 +146,111 @@ export function Messages() {
       })
     } finally {
       setSendingMessage(false)
+      setUploadingFiles(false)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      if (files.length > 5) {
+        toast({
+          title: "Too many files",
+          description: "You can only upload up to 5 files at once",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check file sizes (10MB per file)
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].size > maxSize) {
+          toast({
+            title: "File too large",
+            description: `${files[i].name} is too large. Maximum file size is 10MB.`,
+            variant: "destructive",
+          })
+          return
+        }
+      }
+
+      setSelectedFiles(files)
+      console.log("Selected files:", Array.from(files).map(f => f.name))
+    }
+  }
+
+  const handleFileUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleRemoveFile = (index: number) => {
+    if (selectedFiles) {
+      const dt = new DataTransfer()
+      for (let i = 0; i < selectedFiles.length; i++) {
+        if (i !== index) {
+          dt.items.add(selectedFiles[i])
+        }
+      }
+      setSelectedFiles(dt.files.length > 0 ? dt.files : null)
+      if (fileInputRef.current) {
+        fileInputRef.current.files = dt.files
+      }
+    }
+  }
+
+  const handleDownloadFile = async (filename: string) => {
+    try {
+      await downloadMessageFile(filename)
+      toast({
+        title: "Success",
+        description: "File downloaded successfully"
+      })
+    } catch (error: any) {
+      console.error("Error downloading file:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to download file",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleViewImage = async (filename: string) => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Authentication required",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // For images, we'll open in a new tab with proper auth headers
+      // Note: This is a workaround since img src can't include auth headers
+      const response = await fetch(`http://localhost:3001/api/messages/download/${filename}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load image')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (error: any) {
+      console.error("Error viewing image:", error)
+      toast({
+        title: "Error", 
+        description: error.message || "Failed to view image",
+        variant: "destructive",
+      })
     }
   }
 
@@ -172,7 +298,7 @@ export function Messages() {
         title: "Success",
         description: `Started conversation with ${user.name}`
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error starting conversation:", error)
       toast({
         title: "Error",
@@ -195,7 +321,7 @@ export function Messages() {
       const response = await searchUsers(query) as any
       console.log("Users found:", response.users)
       setUsers(response.users)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching users:", error)
       toast({
         title: "Error",
@@ -429,6 +555,55 @@ export function Messages() {
                           }`}
                         >
                           <p className="text-sm">{message.content}</p>
+                          
+                          {/* Message Attachments */}
+                          {message.attachments && message.attachments.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {message.attachments.map((attachment, index) => {
+                                const fileName = attachment.split('/').pop() || attachment
+                                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
+                                
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`flex items-center gap-2 p-2 rounded border ${
+                                      message.sender._id === 'current-user'
+                                        ? 'bg-blue-500/20 border-blue-400/30'
+                                        : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
+                                    }`}
+                                  >
+                                    {isImage ? (
+                                      <div className="cursor-pointer" onClick={() => handleViewImage(fileName)}>
+                                        <div className="bg-gray-200 dark:bg-gray-700 p-2 rounded flex items-center gap-2">
+                                          <FileText className="h-4 w-4 flex-shrink-0" />
+                                          <span className="flex-1 text-xs truncate">{fileName}</span>
+                                          <span className="text-xs text-gray-500">Image</span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <FileText className="h-4 w-4 flex-shrink-0" />
+                                        <span className="flex-1 text-xs truncate">{fileName}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDownloadFile(fileName)}
+                                          className={`p-1 h-6 w-6 ${
+                                            message.sender._id === 'current-user'
+                                              ? 'hover:bg-blue-500/30 text-blue-100'
+                                              : 'hover:bg-gray-300 dark:hover:bg-gray-600'
+                                          }`}
+                                        >
+                                          <Download className="h-3 w-3" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          
                           <p className={`text-xs mt-1 ${
                             message.sender._id === 'current-user' ? 'text-blue-100' : 'text-gray-500'
                           }`}>
@@ -443,9 +618,67 @@ export function Messages() {
 
               {/* Message Input */}
               <div className="p-4 border-t">
+                {/* File Preview */}
+                {selectedFiles && selectedFiles.length > 0 && (
+                  <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Selected Files ({selectedFiles.length}/5)
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFiles(null)
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = ""
+                          }
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {Array.from(selectedFiles).map((file, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded border">
+                          <FileText className="h-4 w-4 text-gray-500" />
+                          <span className="flex-1 text-sm truncate">{file.name}</span>
+                          <span className="text-xs text-gray-500">
+                            {(file.size / 1024 / 1024).toFixed(1)}MB
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveFile(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon">
-                    <Paperclip className="h-4 w-4" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleFileUploadClick}
+                    disabled={sendingMessage || uploadingFiles}
+                  >
+                    {uploadingFiles ? (
+                      <Upload className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Paperclip className="h-4 w-4" />
+                    )}
                   </Button>
                   <Input
                     placeholder="Type your message..."
@@ -453,13 +686,18 @@ export function Messages() {
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     className="flex-1"
+                    disabled={sendingMessage || uploadingFiles}
                   />
                   <Button
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendingMessage}
+                    disabled={(!newMessage.trim() && !selectedFiles) || sendingMessage || uploadingFiles}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Send className="h-4 w-4" />
+                    {sendingMessage || uploadingFiles ? (
+                      <Upload className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>

@@ -74,6 +74,98 @@ export const sendMessage = async (data: { receiverId: string; content: string; a
   }
 };
 
+// Description: Upload files for message attachments
+// Endpoint: POST /api/messages/upload
+// Request: FormData with files
+// Response: { success: boolean, filePaths: string[] }
+export const uploadMessageFiles = async (files: FileList): Promise<{ success: boolean; filePaths: string[] }> => {
+  try {
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+    const response = await api.post('/api/messages/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
+
+// Description: Send a message with files (handles file upload + message sending)
+// Request: { receiverId: string, content: string, files?: FileList, propertyId?: string }
+// Response: { success: boolean, message: Message }
+export const sendMessageWithFiles = async (data: { 
+  receiverId: string; 
+  content: string; 
+  files: FileList 
+}) => {
+  try {
+    // First upload files
+    const uploadResponse = await uploadMessageFiles(data.files);
+    
+    // Then send message with attachment paths
+    const messageResponse = await api.post('/api/messages', {
+      receiverId: data.receiverId,
+      content: data.content,
+      attachments: uploadResponse.filePaths
+    });
+    
+    return messageResponse.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
+
+// Description: Download message attachment
+// Endpoint: GET /api/messages/download/:filename
+// Request: { filename: string }
+// Response: File blob
+export const downloadMessageFile = async (filename: string) => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`http://localhost:3001/api/messages/download/${filename}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to download file');
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+    
+    // Create a temporary URL for the blob
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create a temporary link element and simulate click to download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename; // This will be the downloaded file name
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error?.message || 'Failed to download file');
+  }
+};
+
 // Description: Mark a message as read
 // Endpoint: PATCH /api/messages/:messageId/read
 // Request: { messageId: string }

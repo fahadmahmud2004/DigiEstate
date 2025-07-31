@@ -1,7 +1,111 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const MessageService = require('../services/messageService.js');
 const { requireUser } = require('./middleware/auth.js');
+
+// Configure multer for message file uploads
+const messageUploadDir = 'uploads/messages/';
+if (!fs.existsSync(messageUploadDir)) {
+  fs.mkdirSync(messageUploadDir, { recursive: true });
+}
+
+const messageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, messageUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, `${name}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const messageUpload = multer({ 
+  storage: messageStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 5 // Maximum 5 files per message
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow common file types
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf', 'text/plain',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not allowed'), false);
+    }
+  }
+});
+
+// Upload files for messages
+router.post('/upload', requireUser, messageUpload.array('files', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    const filePaths = req.files.map(file => file.path);
+    
+    console.log(`[MessageRoutes] Files uploaded: ${filePaths.join(', ')}`);
+    
+    res.json({
+      success: true,
+      filePaths
+    });
+  } catch (error) {
+    console.error(`[MessageRoutes] Error uploading files: ${error.message}`);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Download message attachments
+router.get('/download/:filename', requireUser, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, '..', 'uploads/messages', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+    
+    // Send file
+    res.download(filePath, (err) => {
+      if (err) {
+        console.error(`[MessageRoutes] Error downloading file: ${err.message}`);
+        res.status(500).json({
+          success: false,
+          error: 'Error downloading file'
+        });
+      }
+    });
+  } catch (error) {
+    console.error(`[MessageRoutes] Error in download route: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // Get user's conversations
 router.get('/conversations', requireUser, async (req, res) => {
