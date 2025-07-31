@@ -20,6 +20,9 @@ import { AdminSeed } from "./pages/AdminSeed"
 import { AdminDashboard } from "./pages/AdminDashboard"
 import { AdminProperties } from "./pages/AdminProperties"
 import { AdminPropertyDetails } from "./pages/AdminPropertyDetails"
+import { AdminFraudAlerts } from "./pages/AdminFraudAlerts"
+import { AdminUserReports } from "./pages/AdminUserReports"
+import { AdminProactiveReviews } from "./pages/AdminProactiveReviews"
 import { BlankPage } from "./pages/BlankPage"
 
 function App() {
@@ -45,6 +48,9 @@ function App() {
               <Route path="admin/dashboard" element={<AdminDashboard />} />
               <Route path="admin/properties" element={<AdminProperties />} />
               <Route path="admin/properties/:id" element={<AdminPropertyDetails />} />
+              <Route path="admin/fraud-alerts" element={<AdminFraudAlerts />} />
+              <Route path="admin/user-reports" element={<AdminUserReports />} />
+              <Route path="admin/proactive-reviews" element={<AdminProactiveReviews />} />
             </Route>
             <Route path="*" element={<BlankPage />} />
           </Routes>

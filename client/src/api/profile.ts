@@ -45,3 +45,19 @@ export const updateUserProfile = async (formData: FormData) => {
     throw new Error(error?.response?.data?.error || error.message);
   }
 };
+
+// Description: Change user password
+// Endpoint: PUT /api/profile/change-password
+// Request: { currentPassword: string, newPassword: string }
+// Response: { success: boolean, message: string }
+export const changePassword = async (currentPassword: string, newPassword: string) => {
+  try {
+    const response = await api.put('/api/profile/change-password', {
+      currentPassword,
+      newPassword
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};

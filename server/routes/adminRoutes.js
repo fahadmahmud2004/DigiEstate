@@ -249,12 +249,12 @@ router.get('/complaints', requireAdmin, async (req, res) => {
     const formattedComplaints = result.complaints.map(complaint => ({
       _id: complaint.id,
       complainant: {
-        _id: complaint.complainant,
+        _id: complaint.complainant_id,
         name: complaint.complainant_name || 'Unknown',
         email: complaint.complainant_email || 'Unknown'
       },
       target: {
-        _id: complaint.target,
+        _id: complaint.target_id,
         name: complaint.target_name || complaint.property_title || 'Unknown',
         email: complaint.target_email || ''
       },
@@ -337,6 +337,107 @@ router.put('/complaints/:complaintId/status', requireAdmin, async (req, res) => 
     });
   } catch (error) {
     console.error('[ADMIN] Error updating complaint status:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get fraud alerts and security issues
+router.get('/fraud-alerts', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    console.log(`[ADMIN] GET /api/admin/fraud-alerts - page: ${page}, limit: ${limit}`);
+    
+    // In a real implementation, this would query a fraud_alerts table
+    // For now, we'll return mock data based on existing complaints and properties
+    const db = getDB();
+    
+    // Get complaints that might be fraud-related
+    const fraudComplaints = await db.query(`
+      SELECT 
+        c.id,
+        c.type,
+        c.description,
+        c.status,
+        c.created_at,
+        c.target_type,
+        c.target_id,
+        u1.name as complainant_name,
+        u1.email as complainant_email,
+        u2.name as target_name,
+        u2.email as target_email
+      FROM complaints c
+      JOIN users u1 ON c.complainant_id = u1.id
+      JOIN users u2 ON c.target_id = u2.id
+      WHERE c.type = 'Fraudulent Listing' AND c.status = 'open'
+      ORDER BY c.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, (page - 1) * limit]);
+    
+    // Get properties with suspicious pricing (example: very low prices)
+    const suspiciousProperties = await db.query(`
+      SELECT 
+        p.id,
+        p.title,
+        p.price,
+        p.status,
+        p.created_at,
+        u.name as owner_name,
+        u.email as owner_email
+      FROM properties p
+      JOIN users u ON p.owner_id = u.id
+      WHERE p.price < 1000 AND p.status = 'Active'
+      ORDER BY p.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, (page - 1) * limit]);
+    
+    // Format the data as fraud alerts
+    const alerts = [
+      ...fraudComplaints.rows.map((complaint, index) => ({
+        id: `fraud-${complaint.id}`,
+        type: 'fraud_flag',
+        severity: 'high',
+        title: `Fraudulent Listing Complaint`,
+        description: complaint.description,
+        targetType: complaint.target_type,
+        targetId: complaint.target_id,
+        targetName: complaint.target_name,
+        evidence: ['User complaint filed', 'Fraudulent listing type'],
+        createdAt: complaint.created_at,
+        status: 'pending',
+        riskScore: 85
+      })),
+      ...suspiciousProperties.rows.map((property, index) => ({
+        id: `suspicious-${property.id}`,
+        type: 'fraud_flag',
+        severity: 'medium',
+        title: `Suspicious Property Pricing`,
+        description: `Property "${property.title}" has unusually low price of $${property.price}`,
+        targetType: 'property',
+        targetId: property.id,
+        targetName: property.title,
+        evidence: [`Price $${property.price} is below market average`, 'New seller account'],
+        createdAt: property.created_at,
+        status: 'pending',
+        riskScore: 70
+      }))
+    ];
+    
+    console.log(`[ADMIN] Retrieved ${alerts.length} fraud alerts successfully`);
+    
+    res.json({
+      success: true,
+      alerts: alerts,
+      total: alerts.length,
+      page: page,
+      totalPages: Math.ceil(alerts.length / limit)
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching fraud alerts:', error.message);
     res.status(500).json({
       success: false,
       error: error.message

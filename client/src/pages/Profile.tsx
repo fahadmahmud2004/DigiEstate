@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Camera, Edit, Save, X, Star, Trash2 } from "lucide-react"
+import { Camera, Edit, Save, X, Star, Trash2, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -7,10 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { getUserReviews, createUserReview, updateReview, deleteReview, Review, ReviewsResponse } from "@/api/reviews"
-import { getUserProfile, updateUserProfile, UserProfile } from "@/api/profile"
+import { getUserProfile, updateUserProfile, changePassword, UserProfile } from "@/api/profile"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -31,6 +31,21 @@ export function Profile() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [editingReview, setEditingReview] = useState<Review | null>(null)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+  
+  // Password change states
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+  
   const { toast } = useToast()
 
   useEffect(() => {
@@ -115,11 +130,57 @@ export function Profile() {
     }
   }
 
-  const handleReviewSubmit = async () => {
-    if (!profileData || !reviewData.comment.trim()) {
+  const handlePasswordChange = async () => {
+    // Validate passwords
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "New passwords do not match",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 6 characters long",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPasswordLoading(true)
+    try {
+      const response = await changePassword(passwordData.currentPassword, passwordData.newPassword)
+      toast({
+        title: "Success",
+        description: response.message || "Password changed successfully!",
+      })
+      setPasswordDialogOpen(false)
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      })
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
+  const resetPasswordForm = () => {
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    setShowPasswords({ current: false, new: false, confirm: false })
+  }
+
+  const handleReviewSubmit = async () => {
+    if (!reviewData.comment.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a comment",
         variant: "destructive",
       })
       return
@@ -128,13 +189,13 @@ export function Profile() {
     setReviewLoading(true)
     try {
       if (editingReview) {
-        await updateReview(editingReview._id, reviewData)
+        await updateReview(editingReview._id, reviewData.rating, reviewData.comment)
         toast({
           title: "Success",
           description: "Review updated successfully!",
         })
       } else {
-        await createUserReview(profileData._id, reviewData)
+        await createUserReview(profileData!._id, reviewData.rating, reviewData.comment)
         toast({
           title: "Success",
           description: "Review submitted successfully!",
@@ -142,10 +203,11 @@ export function Profile() {
       }
 
       // Refresh reviews
-      const response = await getUserReviews(profileData._id) as any
-      setReviews(response.data)
+      if (profileData?._id) {
+        const response = await getUserReviews(profileData._id) as any
+        setReviews(response.data)
+      }
 
-      // Reset form
       setReviewData({ rating: 5, comment: '' })
       setEditingReview(null)
       setReviewDialogOpen(false)
@@ -251,35 +313,35 @@ export function Profile() {
         </p>
       </div>
 
+      {/* Profile Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="bg-white/80 backdrop-blur-sm">
-          <TabsTrigger value="profile">Profile Information</TabsTrigger>
-          <TabsTrigger value="settings">Account Settings</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-6">
-          {/* Profile Card */}
+        <TabsContent value="profile">
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>Update your personal details and profile picture</CardDescription>
+                  <CardDescription>Update your profile information and avatar</CardDescription>
                 </div>
                 {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} variant="outline">
+                  <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={handleSave} disabled={loading}>
+                  <div className="flex space-x-2">
+                    <Button onClick={handleSave} disabled={loading} size="sm">
                       <Save className="h-4 w-4 mr-2" />
-                      {loading ? "Saving..." : "Save"}
+                      {loading ? 'Saving...' : 'Save Changes'}
                     </Button>
-                    <Button onClick={() => setIsEditing(false)} variant="outline">
+                    <Button onClick={() => setIsEditing(false)} variant="outline" size="sm">
                       <X className="h-4 w-4 mr-2" />
                       Cancel
                     </Button>
@@ -289,107 +351,77 @@ export function Profile() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Avatar Section */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center space-x-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={isEditing ? editData.avatar : profileData.avatar} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-2xl">
-                      {profileData.name.charAt(0)}
+                    <AvatarImage src={editData.avatar} alt={profileData.name} />
+                    <AvatarFallback className="text-lg">
+                      {profileData.name?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   {isEditing && (
-                    <>
+                    <label className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors">
+                      <Camera className="h-4 w-4" />
                       <input
                         type="file"
-                        id="avatar-upload"
-                        className="hidden"
                         accept="image/*"
                         onChange={handleAvatarChange}
+                        className="hidden"
                       />
-                      <label htmlFor="avatar-upload">
-                        <Button
-                          as="span"
-                          size="icon"
-                          className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                        >
-                          <Camera className="h-4 w-4" />
-                        </Button>
-                      </label>
-                    </>
+                    </label>
                   )}
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                     {profileData.name}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">{profileData.email}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className="bg-yellow-500 hover:bg-yellow-500">
-                      ⭐ {reviews.averageRating > 0 ? reviews.averageRating : profileData.reputation} Rating
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Badge variant={profileData.status === 'active' ? 'default' : 'secondary'}>
+                      {profileData.status}
                     </Badge>
-                    <Badge variant="outline">
-                      Member since {new Date(profileData.joinDate).getFullYear()}
-                    </Badge>
+                    <Badge variant="outline">{profileData.role}</Badge>
                   </div>
                 </div>
               </div>
 
-              {/* Form Fields */}
+              {/* Profile Form */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
-                    value={isEditing ? editData.name : profileData.name}
+                    value={editData.name}
                     onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
                     disabled={!isEditing}
+                    placeholder="Enter your full name"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profileData.email}
-                    disabled={true}
-                  />
-                </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={isEditing ? editData.phone : profileData.phone}
+                    value={editData.phone}
                     onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
                     disabled={!isEditing}
+                    placeholder="Enter your phone number"
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Stats Card */}
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Account Statistics</CardTitle>
-              <CardDescription>Your activity overview</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{profileData.totalListings}</div>
-                  <div className="text-sm text-gray-600">Total Listings</div>
+                  <div className="text-2xl font-bold text-blue-600">{profileData.totalListings || 0}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Listings</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{profileData.totalBookings}</div>
-                  <div className="text-sm text-gray-600">Total Bookings</div>
+                  <div className="text-2xl font-bold text-green-600">{profileData.totalBookings || 0}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Bookings</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600">{reviews.averageRating > 0 ? reviews.averageRating : profileData.reputation}</div>
-                  <div className="text-sm text-gray-600">Average Rating</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-600">{reviews.totalReviews}</div>
-                  <div className="text-sm text-gray-600">Total Reviews</div>
+                  <div className="text-2xl font-bold text-yellow-600">{profileData.reputation || 4.5}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Reputation</div>
                 </div>
               </div>
             </CardContent>
@@ -406,9 +438,97 @@ export function Profile() {
               <div>
                 <h4 className="font-semibold mb-4">Password & Security</h4>
                 <div className="space-y-4">
-                  <Button variant="outline" className="w-full justify-start">
-                    Change Password
-                  </Button>
+                  <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start">
+                        Change Password
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-white">
+                      <DialogHeader>
+                        <DialogTitle>Change Password</DialogTitle>
+                        <DialogDescription>
+                          Enter your current password and choose a new password
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="currentPassword">Current Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="currentPassword"
+                              type={showPasswords.current ? "text" : "password"}
+                              value={passwordData.currentPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                              placeholder="Enter your current password"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                            >
+                              {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="newPassword">New Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="newPassword"
+                              type={showPasswords.new ? "text" : "password"}
+                              value={passwordData.newPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                              placeholder="Enter your new password"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                            >
+                              {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="confirmPassword"
+                              type={showPasswords.confirm ? "text" : "password"}
+                              value={passwordData.confirmPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                              placeholder="Confirm your new password"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                            >
+                              {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                          setPasswordDialogOpen(false)
+                          resetPasswordForm()
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handlePasswordChange} disabled={passwordLoading}>
+                          {passwordLoading ? 'Changing...' : 'Change Password'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                   <Button variant="outline" className="w-full justify-start">
                     Enable Two-Factor Authentication
                   </Button>
@@ -501,20 +621,21 @@ export function Profile() {
                         <Label htmlFor="comment">Comment</Label>
                         <Textarea
                           id="comment"
-                          placeholder="Share your thoughts about this user..."
                           value={reviewData.comment}
                           onChange={(e) => setReviewData(prev => ({ ...prev, comment: e.target.value }))}
+                          placeholder="Share your experience..."
                           rows={4}
                         />
                       </div>
-                      <Button
-                        onClick={handleReviewSubmit}
-                        disabled={reviewLoading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
-                      >
-                        {reviewLoading ? "Submitting..." : editingReview ? "Update Review" : "Submit Review"}
-                      </Button>
                     </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleReviewSubmit} disabled={reviewLoading}>
+                        {reviewLoading ? 'Submitting...' : (editingReview ? 'Update Review' : 'Submit Review')}
+                      </Button>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -524,60 +645,47 @@ export function Profile() {
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                      <div className="h-16 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                      <div className="h-20 bg-gray-200 rounded"></div>
                     </div>
                   ))}
                 </div>
               ) : reviews.reviews.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {reviews.reviews.map((review) => (
-                    <div key={review._id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={review.reviewer.avatar} />
-                            <AvatarFallback className="bg-blue-600 text-white text-sm">
-                              {review.reviewer.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-sm">{review.reviewer.name}</div>
-                            <div className="flex items-center gap-2">
-                              {renderStars(review.rating)}
-                              <span className="text-xs text-gray-500">
-                                {new Date(review.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
+                    <div key={review._id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          {renderStars(review.rating)}
+                          <span className="text-sm text-gray-600">by {review.reviewer.name}</span>
                         </div>
-                        {profileData && profileData._id === review.reviewerId && (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditReview(review)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteReview(review._id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditReview(review)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteReview(review._id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>
+                      <p className="text-gray-700 dark:text-gray-300">{review.comment}</p>
+                      <div className="text-sm text-gray-500 mt-2">
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Star className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>No reviews yet. Be the first to review this user!</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No reviews yet</p>
                 </div>
               )}
             </CardContent>

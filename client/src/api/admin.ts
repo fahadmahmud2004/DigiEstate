@@ -126,3 +126,16 @@ export const deleteProperty = async (propertyId: string, reason?: string) => {
     throw new Error(error?.response?.data?.error || error.message);
   }
 };
+
+// Description: Get fraud alerts for admin review
+// Endpoint: GET /api/admin/fraud-alerts
+// Request: { page?: number, limit?: number }
+// Response: { success: boolean, alerts: any[], total: number, page: number, totalPages: number }
+export const getFraudAlerts = async (page = 1, limit = 10) => {
+  try {
+    const response = await api.get(`/api/admin/fraud-alerts?page=${page}&limit=${limit}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
