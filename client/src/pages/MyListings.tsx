@@ -196,10 +196,12 @@ export function MyListings() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-lg">
                     {property.status !== 'Rejected' && (
-                      <DropdownMenuItem>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Listing
-                      </DropdownMenuItem>
+                      <Link to={`/edit-listing/${property._id}`}>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Listing
+                        </DropdownMenuItem>
+                      </Link>
                     )}
                     <Link to={`/properties/${property._id}`}>
                       <DropdownMenuItem>

@@ -86,9 +86,21 @@ export function PropertyDetails() {
         console.log(`[PropertyDetails] Fetching reviews for property ID: ${id}`)
         const response = await getPropertyReviews(id) as any
         console.log(`[PropertyDetails] Reviews response:`, response)
-        setReviews(response.data)
+        
+        // Ensure we have a valid reviews structure
+        if (response?.data && typeof response.data === 'object') {
+          setReviews({
+            reviews: Array.isArray(response.data.reviews) ? response.data.reviews : [],
+            averageRating: response.data.averageRating || 0,
+            totalReviews: response.data.totalReviews || 0
+          })
+        } else {
+          console.warn('[PropertyDetails] Invalid reviews response structure:', response)
+          setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
+        }
       } catch (error) {
         console.error(`[PropertyDetails] Error fetching reviews:`, error)
+        setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
       } finally {
         setReviewsLoading(false)
       }
@@ -166,7 +178,18 @@ export function PropertyDetails() {
       console.log(`[PropertyDetails] Refreshing reviews for property ${property._id}`)
       const response = await getPropertyReviews(property._id) as any
       console.log(`[PropertyDetails] Refreshed reviews response:`, response)
-      setReviews(response.data)
+      
+      // Ensure we have a valid reviews structure
+      if (response?.data && typeof response.data === 'object') {
+        setReviews({
+          reviews: Array.isArray(response.data.reviews) ? response.data.reviews : [],
+          averageRating: response.data.averageRating || 0,
+          totalReviews: response.data.totalReviews || 0
+        })
+      } else {
+        console.warn('[PropertyDetails] Invalid reviews response structure after submit:', response)
+        setReviews({ reviews: [], averageRating: 0, totalReviews: 0 })
+      }
 
       // Reset form
       setReviewData({ rating: 5, comment: '' })
@@ -501,7 +524,7 @@ export function PropertyDetails() {
                   <div className="flex items-center gap-4">
                     <Badge className="bg-blue-600 hover:bg-blue-600">{property.type}</Badge>
                     <Badge className="bg-green-600 hover:bg-green-600">{property.availability}</Badge>
-                    {reviews.totalReviews > 0 && (
+                    {reviews && reviews.totalReviews > 0 && (
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                         <span className="text-sm font-medium">{reviews.averageRating}</span>
@@ -588,12 +611,16 @@ export function PropertyDetails() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {property.nearbyFacilities.map((facility, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium">{facility.name}</span>
-                    <span className="text-sm text-gray-600">{facility.distance} km</span>
-                  </div>
-                ))}
+                {Array.isArray(property.nearbyFacilities) && property.nearbyFacilities.length > 0 ? (
+                  property.nearbyFacilities.map((facility, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <span className="font-medium">{facility.name}</span>
+                      <span className="text-sm text-gray-600">{facility.distance} km</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-gray-500 italic">No nearby facilities listed</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -605,7 +632,7 @@ export function PropertyDetails() {
                 <div>
                   <CardTitle>Reviews & Ratings</CardTitle>
                   <CardDescription>
-                    {reviews.totalReviews > 0
+                    {reviews && reviews.totalReviews > 0
                       ? `${reviews.totalReviews} review${reviews.totalReviews > 1 ? 's' : ''} with an average rating of ${reviews.averageRating}/5`
                       : 'No reviews yet'
                     }
@@ -671,7 +698,7 @@ export function PropertyDetails() {
                     </div>
                   ))}
                 </div>
-              ) : reviews.reviews.length > 0 ? (
+              ) : reviews && reviews.reviews && reviews.reviews.length > 0 ? (
                 <div className="space-y-6">
                   {reviews.reviews.map((review) => (
                     <div key={review._id} className="border-b border-gray-200 pb-4 last:border-b-0">

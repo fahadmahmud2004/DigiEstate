@@ -9,7 +9,7 @@ router.get('/users/:userId/reviews', async (req, res) => {
     const { userId } = req.params;
     console.log(`[REVIEW] GET /api/reviews/users/${userId}/reviews - Fetching user reviews`);
 
-    const reviews = await ReviewService.getByTargetId(userId, 'user');
+    const reviews = await ReviewService.getReviewsByTarget('user', userId);
 
     console.log(`[REVIEW] Retrieved ${reviews.length} reviews for user ${userId}`);
 
@@ -41,7 +41,7 @@ router.get('/properties/:propertyId/reviews', async (req, res) => {
     const { propertyId } = req.params;
     console.log(`[REVIEW] GET /api/reviews/properties/${propertyId}/reviews - Fetching property reviews`);
 
-    const reviews = await ReviewService.getByTargetId(propertyId, 'property');
+    const reviews = await ReviewService.getReviewsByTarget('property', propertyId);
 
     console.log(`[REVIEW] Retrieved ${reviews.length} reviews for property ${propertyId}`);
 

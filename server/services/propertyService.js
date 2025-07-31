@@ -15,8 +15,8 @@ class PropertyService {
       price: parseFloat(row.price),
       location: row.location,
       availability: row.availability,
-      images: row.images ? row.images.map(img => `${baseUrl}/${img.replace(/\\/g, '/')}`) : [],
-      videos: row.videos || [],
+      images: Array.isArray(row.images) ? row.images.map(img => `${baseUrl}/${img.replace(/\\/g, '/')}`) : [],
+      videos: Array.isArray(row.videos) ? row.videos : [],
       features: {
         bedrooms: row.bedrooms,
         bathrooms: row.bathrooms,
@@ -30,9 +30,9 @@ class PropertyService {
         hasAC: row.has_ac,
         hasLift: row.has_lift,
         hasParking: row.has_parking,
-        customFeatures: row.custom_features || []
+        customFeatures: Array.isArray(row.custom_features) ? row.custom_features : []
       },
-      nearbyFacilities: row.nearby_facilities || [],
+      nearbyFacilities: Array.isArray(row.nearby_facilities) ? row.nearby_facilities : [],
       owner: {
         _id: row.owner_id,
         name: row.owner_name || 'Unknown',
@@ -269,20 +269,22 @@ class PropertyService {
       
       // Get image paths and other features from the data objects
       const imageUrls = propertyData.images || [];
+      const videoUrls = propertyData.videos || []; // Handle videos array
       console.log('[PropertyService] Image URLs:', imageUrls);
+      console.log('[PropertyService] Video URLs:', videoUrls);
       const customFeatures = features.customFeatures || [];
       const nearbyFacilitiesJson = JSON.stringify(nearbyFacilities);
 
       const query = `
         INSERT INTO properties (
           id, owner_id, status, title, description, type, price, location, availability,
-          images, bedrooms, bathrooms, floor_number, total_floors, area, road_width,
+          images, videos, bedrooms, bathrooms, floor_number, total_floors, area, road_width,
           is_corner_plot, parking_spaces, is_furnished, has_ac, has_lift, has_parking,
           custom_features, nearby_facilities, listing_type, created_at, updated_at
         ) VALUES (
           $1, $2, 'Pending Verification', $3, $4, $5, $6, $7, $8, 
-          $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 
-          $22, $23, $24, NOW(), NOW()
+          $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+          $23, $24, $25, NOW(), NOW()
         ) RETURNING *;
       `;
       
@@ -296,6 +298,7 @@ class PropertyService {
         propertyData.location,                  // location
         propertyData.availability,              // availability
         imageUrls,                              // images (text[])
+        videoUrls,                              // videos (text[])
         features.bedrooms || null,              // bedrooms
         features.bathrooms || null,             // bathrooms
         features.floorNumber || null,           // floor_number
@@ -343,6 +346,133 @@ class PropertyService {
     }
   }
 
+  static async update(propertyId, propertyData, ownerId) {
+    const db = getDB();
+    try {
+      console.log(`[PropertyService] Updating property ${propertyId} by owner ${ownerId}`);
+      
+      // First, verify the property exists and belongs to the user
+      const checkQuery = `SELECT id, owner_id FROM properties WHERE id = $1 AND owner_id = $2`;
+      const checkResult = await db.query(checkQuery, [propertyId, ownerId]);
+      
+      if (checkResult.rows.length === 0) {
+        throw new Error('Property not found or you do not have permission to edit it');
+      }
+
+      // Handle images - if new images are provided, they replace existing ones
+      let images = [];
+      if (propertyData.images && propertyData.images.length > 0) {
+        images = propertyData.images;
+      } else if (propertyData.existingImages) {
+        // Keep existing images if no new ones provided
+        images = JSON.parse(propertyData.existingImages);
+      }
+
+      // Handle videos similarly
+      let videos = [];
+      if (propertyData.videos && propertyData.videos.length > 0) {
+        videos = propertyData.videos;
+      } else if (propertyData.existingVideos) {
+        // Keep existing videos if no new ones provided
+        videos = JSON.parse(propertyData.existingVideos);
+      }
+
+      // Parse custom features
+      let customFeatures = [];
+      if (propertyData.customFeatures) {
+        try {
+          customFeatures = JSON.parse(propertyData.customFeatures);
+        } catch (e) {
+          console.warn('Failed to parse customFeatures, using empty array');
+        }
+      }
+
+      // Parse nearby facilities
+      let nearbyFacilities = [];
+      if (propertyData.nearbyFacilities) {
+        try {
+          const parsed = JSON.parse(propertyData.nearbyFacilities);
+          nearbyFacilities = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.warn('Failed to parse nearbyFacilities, using empty array');
+          nearbyFacilities = [];
+        }
+      }
+
+      const updateQuery = `
+        UPDATE properties SET
+          listing_type = $2,
+          title = $3,
+          description = $4,
+          type = $5,
+          price = $6,
+          location = $7,
+          availability = $8,
+          images = $9,
+          videos = $10,
+          bedrooms = $11,
+          bathrooms = $12,
+          floor_number = $13,
+          total_floors = $14,
+          area = $15,
+          road_width = $16,
+          is_corner_plot = $17,
+          parking_spaces = $18,
+          is_furnished = $19,
+          has_ac = $20,
+          has_lift = $21,
+          has_parking = $22,
+          custom_features = $23,
+          nearby_facilities = $24,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND owner_id = $25
+        RETURNING *
+      `;
+
+      const values = [
+        propertyId,
+        propertyData.listingType,
+        propertyData.title,
+        propertyData.description,
+        propertyData.type,
+        parseFloat(propertyData.price),
+        propertyData.location,
+        propertyData.availability,
+        images,
+        videos,
+        propertyData.bedrooms ? parseInt(propertyData.bedrooms) : null,
+        propertyData.bathrooms ? parseInt(propertyData.bathrooms) : null,
+        propertyData.floorNumber ? parseInt(propertyData.floorNumber) : null,
+        propertyData.totalFloors ? parseInt(propertyData.totalFloors) : null,
+        propertyData.area ? parseFloat(propertyData.area) : null,
+        propertyData.roadWidth ? parseFloat(propertyData.roadWidth) : null,
+        propertyData.isCornerPlot === 'true',
+        propertyData.parkingSpaces ? parseInt(propertyData.parkingSpaces) : null,
+        propertyData.isFurnished === 'true',
+        propertyData.hasAC === 'true',
+        propertyData.hasLift === 'true',
+        propertyData.hasParking === 'true',
+        customFeatures,
+        JSON.stringify(nearbyFacilities),
+        ownerId
+      ];
+
+      console.log('[PropertyService] Executing update query with values:', values);
+      const result = await db.query(updateQuery, values);
+
+      if (result.rows.length === 0) {
+        throw new Error('Failed to update property');
+      }
+
+      console.log('[PropertyService] Successfully updated property:', result.rows[0]);
+      return this.formatProperty(result.rows[0]);
+
+    } catch (err) {
+      console.error(`[PropertyService] Error updating property ${propertyId}:`, err);
+      throw new Error(err.message || 'Database error while updating property.');
+    }
+  }
+
   static async delete(propertyId, ownerId, isAdminDeletion = false) {
     const db = getDB();
     try {
@@ -386,16 +516,31 @@ class PropertyService {
         // USER DELETION: Hard delete (they own it, can remove completely)
         console.log(`[PropertyService] User hard-deleting property (complete removal)`);
         
-        const deleteQuery = `DELETE FROM properties WHERE id = $1 AND owner_id = $2`;
-        const deleteResult = await db.query(deleteQuery, [propertyId, ownerId]);
+        // First, create a custom notification for self-deletion
+        const notificationQuery = `
+          INSERT INTO notifications (user_id, type, title, message, data, created_at)
+          VALUES ($1, 'property', 'Property Deleted', 'Your property "' || (SELECT COALESCE(title, 'Untitled Property') FROM properties WHERE id = $2) || '" has been deleted successfully.', 
+          jsonb_build_object('propertyId', $2, 'propertyTitle', (SELECT COALESCE(title, 'Untitled Property') FROM properties WHERE id = $2), 'action', 'self_deletion'), NOW())
+        `;
+        
+        // Temporarily disable the trigger to avoid the "admin deleted" message
+        await db.query('ALTER TABLE properties DISABLE TRIGGER property_deletion_trigger');
+        
+        try {
+          // Send the self-deletion notification
+          await db.query(notificationQuery, [ownerId, propertyId]);
+          
+          const deleteQuery = `DELETE FROM properties WHERE id = $1 AND owner_id = $2`;
+          const deleteResult = await db.query(deleteQuery, [propertyId, ownerId]);
 
-        if (deleteResult.rowCount === 0) {
-          throw new Error('Failed to delete property');
+          if (deleteResult.rowCount === 0) {
+            throw new Error('Failed to delete property');
+          }
+        } finally {
+          // Re-enable the trigger
+          await db.query('ALTER TABLE properties ENABLE TRIGGER property_deletion_trigger');
         }
 
-        // Note: This will trigger the property_deletion_trigger
-        // which handles notifications (but no penalty for user deletions)
-        
         console.log(`[PropertyService] Successfully hard-deleted property ${propertyId}`);
         return { success: true, message: 'Property deleted successfully' };
       }

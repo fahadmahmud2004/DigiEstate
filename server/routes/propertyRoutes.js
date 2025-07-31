@@ -93,6 +93,39 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Update property by ID
+router.put('/:id', requireUser, upload.array('images', 10), async (req, res) => {
+  try {
+    console.log(`[PROPERTY ROUTE] Received PUT request to update property ${req.params.id} by user ${req.user.id}`);
+    console.log('--- Request Body (Text Fields) ---');
+    console.log(req.body);
+    console.log('--- Request Files (New Images) ---');
+    console.log(req.files);
+    console.log('-----------------------------------');
+
+    const propertyData = {
+      ...req.body,
+      images: req.files ? req.files.map(file => file.path) : []
+    };
+
+    console.log('[PROPERTY ROUTE] Processed propertyData for update:', propertyData);
+
+    const updatedProperty = await PropertyService.update(req.params.id, propertyData, req.user.id);
+
+    res.json({
+      success: true,
+      message: 'Property updated successfully',
+      property: updatedProperty
+    });
+  } catch (error) {
+    console.error('[PROPERTY ROUTE] Error updating property:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update property'
+    });
+  }
+});
+
 // Delete property by ID
 router.delete('/:id', requireUser, async (req, res) => {
   try {

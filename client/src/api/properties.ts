@@ -118,6 +118,16 @@ export const createProperty = async (formData: FormData) => {
   }
 };
 
+export const updateProperty = async (propertyId: string, formData: FormData) => {
+  try {
+    const response = await api.put(`/api/properties/${propertyId}`, formData);
+    return response.data;
+  } catch (error: any) {
+    console.error("API error updating property:", error.response?.data);
+    throw new Error(error?.response?.data?.error || 'Failed to update property listing.');
+  }
+};
+
 export const getMyListings = async () => {
   try {
     const response = await api.get('/api/properties/my-listings');

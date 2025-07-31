@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useCallback, useEffect } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { useForm, Controller, FieldName } from "react-hook-form"
 import { useDropzone } from 'react-dropzone'
 import { Plus, X, Upload, MapPin, Building, Home } from "lucide-react"
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { createProperty } from "@/api/properties"
+import { createProperty, updateProperty, getPropertyById } from "@/api/properties"
 import { useToast } from "@/hooks/useToast"
 
 interface PropertyFormData {
@@ -43,10 +43,13 @@ interface PropertyFormData {
 
 export function CreateListing() {
   const navigate = useNavigate()
+  const { id: propertyId } = useParams()
+  const isEditMode = Boolean(propertyId)
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [images, setImages] = useState<File[]>([])
+  const [existingImages, setExistingImages] = useState<string[]>([])
   const [customFeature, setCustomFeature] = useState("")
   const [facilityName, setFacilityName] = useState("")
   const [facilityDistance, setFacilityDistance] = useState("")
@@ -60,6 +63,60 @@ export function CreateListing() {
       nearbyFacilities: []
     }
   })
+
+  // Load existing property data when editing
+  useEffect(() => {
+    const loadPropertyData = async () => {
+      if (isEditMode && propertyId) {
+        try {
+          setLoading(true)
+          const response = await getPropertyById(propertyId)
+          const property = response.property
+
+          // Set form values
+          setValue('listingType', property.listingType)
+          setValue('title', property.title)
+          setValue('description', property.description)
+          setValue('type', property.type)
+          setValue('price', property.price)
+          setValue('location', property.location)
+          setValue('availability', property.availability)
+          
+          // Set features
+          setValue('features.bedrooms', property.features.bedrooms)
+          setValue('features.bathrooms', property.features.bathrooms)
+          setValue('features.floorNumber', property.features.floorNumber)
+          setValue('features.totalFloors', property.features.totalFloors)
+          setValue('features.area', property.features.area)
+          setValue('features.roadWidth', property.features.roadWidth)
+          setValue('features.isCornerPlot', property.features.isCornerPlot)
+          setValue('features.parkingSpaces', property.features.parkingSpaces)
+          setValue('features.isFurnished', property.features.isFurnished)
+          setValue('features.hasAC', property.features.hasAC)
+          setValue('features.hasLift', property.features.hasLift)
+          setValue('features.hasParking', property.features.hasParking)
+          setValue('features.customFeatures', property.features.customFeatures || [])
+          
+          setValue('nearbyFacilities', property.nearbyFacilities || [])
+          
+          // Set existing images
+          setExistingImages(property.images || [])
+          
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to load property data",
+            variant: "destructive",
+          })
+          navigate('/my-listings')
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadPropertyData()
+  }, [isEditMode, propertyId, setValue, toast, navigate])
 
   const propertyType = watch("type")
   const customFeatures = watch("features.customFeatures") || []
@@ -93,10 +150,18 @@ export function CreateListing() {
   };
 
   const onSubmit = async (data: PropertyFormData) => {
-    if (images.length === 0) {
+    // For edit mode, allow no new images if existing images exist
+    if (!isEditMode && images.length === 0) {
       toast({ title: "Images Required", description: "Please upload at least one image.", variant: "destructive" });
       return;
     }
+    
+    // For edit mode, check if we have either new images or existing images
+    if (isEditMode && images.length === 0 && existingImages.length === 0) {
+      toast({ title: "Images Required", description: "Please upload at least one image.", variant: "destructive" });
+      return;
+    }
+    
     setLoading(true);
     const formData = new FormData();
     
@@ -107,16 +172,31 @@ export function CreateListing() {
       formData.append(key, typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value));
     });
 
+    // Add new images
     images.forEach(imageFile => {
       formData.append('images', imageFile);
     });
+    
+    // For edit mode, include existing images
+    if (isEditMode && existingImages.length > 0) {
+      formData.append('existingImages', JSON.stringify(existingImages));
+    }
 
     try {
-      await createProperty(formData);
-      toast({ title: "Success", description: "Property listing created successfully!" });
+      if (isEditMode && propertyId) {
+        await updateProperty(propertyId, formData);
+        toast({ title: "Success", description: "Property listing updated successfully!" });
+      } else {
+        await createProperty(formData);
+        toast({ title: "Success", description: "Property listing created successfully!" });
+      }
       navigate("/my-listings");
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create property listing.", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: isEditMode ? "Failed to update property listing." : "Failed to create property listing.", 
+        variant: "destructive" 
+      });
     } finally {      
       setLoading(false);
     }
@@ -150,7 +230,9 @@ export function CreateListing() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-4">
-      <h1 className="text-3xl font-bold">Create Property Listing</h1>
+      <h1 className="text-3xl font-bold">
+        {isEditMode ? 'Edit Property Listing' : 'Create Property Listing'}
+      </h1>
       <div className="flex items-center justify-between mb-8">
         {steps.map((step, index) => (
           <div key={step.id} className="flex items-center flex-grow">
@@ -293,8 +375,40 @@ export function CreateListing() {
           <Card>
             <CardHeader><CardTitle>Images & Nearby Facilities</CardTitle></CardHeader>
             <CardContent className="space-y-6">
+              {/* Show existing images in edit mode */}
+              {isEditMode && existingImages.length > 0 && (
+                <div>
+                  <Label>Current Images</Label>
+                  <div className="mt-2 grid grid-cols-3 gap-4">
+                    {existingImages.map((imageUrl, index) => (
+                      <div key={index} className="relative">
+                        <img 
+                          src={imageUrl} 
+                          alt={`Property ${index + 1}`} 
+                          className="w-full h-24 object-cover rounded-md border" 
+                        />
+                        <Button 
+                          type="button" 
+                          variant="destructive" 
+                          size="icon" 
+                          className="absolute top-1 right-1 h-5 w-5" 
+                          onClick={() => {
+                            const newExistingImages = existingImages.filter((_, i) => i !== index);
+                            setExistingImages(newExistingImages);
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div>
-                <Label>Property Images *</Label>
+                <Label>
+                  {isEditMode ? 'Add New Images (optional)' : 'Property Images *'}
+                </Label>
                 <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${isDragActive ? 'border-blue-500' : 'border-gray-300'}`}>
                   <input {...getInputProps()} />
                   <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
@@ -344,7 +458,12 @@ export function CreateListing() {
           {currentStep < 4 ? (
             <Button type="button" onClick={handleNext}>Next</Button>
           ) : (
-            <Button type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit Listing"}</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 
+                (isEditMode ? "Updating..." : "Submitting...") : 
+                (isEditMode ? "Update Listing" : "Submit Listing")
+              }
+            </Button>
           )}
         </div>
       </form>
