@@ -67,44 +67,44 @@ export function MyBookings() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Bookings</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
+        <h1 className="text-3xl font-bold text-readable">My Bookings</h1>
+        <p className="text-muted-readable mt-1">
           Track your property viewing requests and appointments
         </p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-yellow-600">
               {filterBookings('pending').length}
             </div>
-            <div className="text-sm text-gray-600">Pending</div>
+            <div className="text-sm text-muted-readable">Pending</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-green-600">
               {filterBookings('accepted').length}
             </div>
-            <div className="text-sm text-gray-600">Accepted</div>
+            <div className="text-sm text-muted-readable">Accepted</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-blue-600">
               {filterBookings('completed').length}
             </div>
-            <div className="text-sm text-gray-600">Completed</div>
+            <div className="text-sm text-muted-readable">Completed</div>
           </CardContent>
         </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <Card className="bg-card-solid border border-border shadow-lg">
           <CardContent className="p-6">
             <div className="text-2xl font-bold text-red-600">
               {filterBookings('declined').length}
             </div>
-            <div className="text-sm text-gray-600">Declined</div>
+            <div className="text-sm text-muted-readable">Declined</div>
           </CardContent>
         </Card>
       </div>

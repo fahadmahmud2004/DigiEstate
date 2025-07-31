@@ -23,7 +23,7 @@ export function Header() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-  const { user, logout, notifications } = useAuth()  // Ensure these exist in context
+  const { user, logout, unreadCount } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -56,9 +56,9 @@ export function Header() {
           onClick={() => navigate("/notifications")}
         >
           <Bell className="h-5 w-5 text-readable" />
-          {notifications?.length > 0 && (
+          {unreadCount > 0 && (
             <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500 hover:bg-red-500 text-white">
-              {notifications.length}
+              {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
           )}
         </Button>

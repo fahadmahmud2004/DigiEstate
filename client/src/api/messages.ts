@@ -196,3 +196,19 @@ export const markConversationAsRead = async (conversationId: string) => {
     throw new Error(error?.response?.data?.error || error.message);
   }
 };
+
+// Description: Send message to AI and get response
+// Endpoint: POST /api/messages/ai-chat
+// Request: { message: string, conversationHistory?: Message[] }
+// Response: { success: boolean, message: Message }
+export const sendAIMessage = async (data: { 
+  message: string; 
+  conversationHistory?: Message[] 
+}) => {
+  try {
+    const response = await api.post('/api/messages/ai-chat', data);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
