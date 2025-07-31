@@ -17,9 +17,43 @@ class MessageService {
       const messageId = randomUUID();
       const now = new Date().toISOString();
 
+      // If propertyId is provided, fetch property details to cache
+      let propertyTitle = null;
+      let propertyLocation = null;
+      let propertyPrice = null;
+      let propertyImageUrl = null;
+
+      if (propertyId) {
+        console.log(`[MessageService] Fetching property details for propertyId: ${propertyId}`);
+        try {
+          const propertyQuery = `SELECT title, location, price, images FROM properties WHERE id = $1`;
+          const propertyResult = await db.query(propertyQuery, [propertyId]);
+          if (propertyResult.rows.length > 0) {
+            const property = propertyResult.rows[0];
+            propertyTitle = property.title;
+            propertyLocation = property.location;
+            propertyPrice = property.price;
+            propertyImageUrl = property.images && property.images.length > 0 ? property.images[0] : null;
+            console.log(`[MessageService] Property context cached:`, {
+              title: propertyTitle,
+              location: propertyLocation,
+              price: propertyPrice,
+              imageUrl: propertyImageUrl
+            });
+          } else {
+            console.warn(`[MessageService] Property ${propertyId} not found in database`);
+          }
+        } catch (error) {
+          console.warn(`[MessageService] Failed to fetch property details for ${propertyId}:`, error.message);
+          // Continue without property context if fetch fails
+        }
+      } else {
+        console.log(`[MessageService] No propertyId provided, skipping property context`);
+      }
+
       const insertQuery = `
-        INSERT INTO messages (id, sender_id, receiver_id, content, attachments, is_read, conversation_id, property_id, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO messages (id, sender_id, receiver_id, content, attachments, is_read, conversation_id, property_id, property_title, property_location, property_price, property_image_url, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `;
 
@@ -32,6 +66,10 @@ class MessageService {
         false,
         conversationId,
         propertyId,
+        propertyTitle,
+        propertyLocation,
+        propertyPrice,
+        propertyImageUrl,
         now,
         now
       ]);
@@ -55,6 +93,10 @@ class MessageService {
         isRead: message.is_read,
         conversationId: message.conversation_id,
         propertyId: message.property_id,
+        propertyTitle: message.property_title,
+        propertyLocation: message.property_location,
+        propertyPrice: message.property_price,
+        propertyImageUrl: message.property_image_url,
         createdAt: message.created_at,
         updatedAt: message.updated_at
       };
@@ -139,12 +181,10 @@ class MessageService {
       const query = `
         SELECT m.*, 
                s.name as sender_name, s.avatar as sender_avatar,
-               r.name as receiver_name, r.avatar as receiver_avatar,
-               p.title as property_title, p.location as property_location
+               r.name as receiver_name, r.avatar as receiver_avatar
         FROM messages m
         LEFT JOIN users s ON m.sender_id = s.id
         LEFT JOIN users r ON m.receiver_id = r.id
-        LEFT JOIN properties p ON m.property_id = p.id
         WHERE m.conversation_id = $1 AND (m.sender_id = $2 OR m.receiver_id = $2)
         ORDER BY m.created_at ASC
       `;
@@ -166,8 +206,10 @@ class MessageService {
         isRead: row.is_read,
         conversationId: row.conversation_id,
         propertyId: row.property_id,
-        propertyTitle: row.property_title,
-        propertyLocation: row.property_location,
+        propertyTitle: row.property_title, // Now from cached data
+        propertyLocation: row.property_location, // Now from cached data
+        propertyPrice: row.property_price, // Now from cached data
+        propertyImageUrl: row.property_image_url, // Now from cached data
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));

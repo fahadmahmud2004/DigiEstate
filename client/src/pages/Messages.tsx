@@ -63,6 +63,21 @@ export function Messages() {
           console.log("Fetching messages for conversation:", selectedConversation)
           const response = await getMessages(selectedConversation) as any
           console.log("Messages fetched:", response.messages)
+          
+          // Debug: Check for property context in messages
+          const messagesWithProperty = response.messages.filter((msg: any) => msg.propertyId)
+          if (messagesWithProperty.length > 0) {
+            console.log("Messages with property context found:", messagesWithProperty.map((msg: any) => ({
+              id: msg._id,
+              propertyId: msg.propertyId,
+              propertyTitle: msg.propertyTitle,
+              propertyLocation: msg.propertyLocation,
+              propertyPrice: msg.propertyPrice
+            })))
+          } else {
+            console.log("No messages with property context found")
+          }
+          
           setMessages(response.messages)
           // Mark conversation as read when opened
           await markConversationAsRead(selectedConversation)
@@ -213,6 +228,39 @@ export function Messages() {
       toast({
         title: "Error",
         description: error.message || "Failed to download file",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handlePropertyClick = async (propertyId: string) => {
+    try {
+      // First, try to fetch the property to see if it still exists
+      const response = await fetch(`http://localhost:3001/api/properties/${propertyId}`)
+      
+      if (response.ok) {
+        // Property exists, navigate to it
+        navigate(`/properties/${propertyId}`)
+      } else if (response.status === 404) {
+        // Property was deleted, show user-friendly message with context
+        toast({
+          title: "Property No Longer Available",
+          description: "This property has been removed or deleted. However, you can still see the conversation context above.",
+          variant: "destructive",
+        })
+      } else {
+        // Other error, generic message
+        toast({
+          title: "Error",
+          description: "Unable to load property details at this time.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error checking property:", error)
+      toast({
+        title: "Error",
+        description: "Unable to load property details. Please try again later.",
         variant: "destructive",
       })
     }
@@ -575,7 +623,7 @@ export function Messages() {
                                   ? 'bg-blue-500/20 border-blue-400/30 hover:bg-blue-500/30'
                                   : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600'
                               }`}
-                              onClick={() => navigate(`/properties/${message.propertyId}`)}
+                              onClick={() => message.propertyId && handlePropertyClick(message.propertyId)}
                             >
                               <div className="flex items-center gap-2">
                                 <Home className="h-4 w-4 flex-shrink-0" />
@@ -588,14 +636,23 @@ export function Messages() {
                                       Property
                                     </Badge>
                                   </div>
-                                  {message.propertyLocation && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <MapPin className="h-3 w-3" />
-                                      <span className="text-xs opacity-75 truncate">
-                                        {message.propertyLocation}
-                                      </span>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <div className="flex-1 min-w-0">
+                                      {message.propertyLocation && (
+                                        <div className="flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          <span className="text-xs opacity-75 truncate">
+                                            {message.propertyLocation}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
+                                    {message.propertyPrice && (
+                                      <span className="text-xs font-medium opacity-90 ml-2">
+                                        ${Number(message.propertyPrice).toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>

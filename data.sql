@@ -455,9 +455,31 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION apply_property_deletion_penalty()
 RETURNS TRIGGER AS $$
+DECLARE
+    deletion_context TEXT;
 BEGIN
-    UPDATE users SET reputation = GREATEST(reputation - 1.0, 0.0) WHERE id = OLD.owner_id;
-    INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (OLD.owner_id, 'system', 'Property Deleted - Reputation Penalty', 'Your property "' || OLD.title || '" has been deleted. A 1.0 point reputation penalty has been applied.', false, NOW());
+    -- Check if this is an admin deletion or user self-deletion
+    -- Get context from session variable (set by application)
+    deletion_context := current_setting('app.deletion_context', true);
+    
+    -- Only apply penalty for admin deletions
+    IF deletion_context = 'admin' THEN
+        UPDATE users SET reputation = GREATEST(reputation - 1.0, 0.0) WHERE id = OLD.owner_id;
+        INSERT INTO notifications (user_id, type, title, message, is_read, created_at) 
+        VALUES (OLD.owner_id, 'system', 'Property Deleted - Reputation Penalty', 
+               'Your property "' || OLD.title || '" has been deleted by an administrator. A 1.0 point reputation penalty has been applied.', 
+               false, NOW());
+    ELSE
+        -- User self-deletion: no penalty, but still notify
+        INSERT INTO notifications (user_id, type, title, message, is_read, created_at) 
+        VALUES (OLD.owner_id, 'system', 'Property Deleted', 
+               'Your property "' || OLD.title || '" has been successfully deleted.', 
+               false, NOW());
+    END IF;
+    
+    RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error in apply_property_deletion_penalty: %', SQLERRM;
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;

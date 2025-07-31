@@ -327,15 +327,82 @@ class PropertyService {
   static async getByOwner(ownerId) {
     try {
       const db = getDB();
+      // Show ALL properties for owner (including rejected/deleted ones)
+      // This allows owners to see what happened to their properties
       const query = `
         SELECT p.*, u.name as owner_name, u.email as owner_email, u.phone as owner_phone, u.avatar as owner_avatar
-        FROM properties p LEFT JOIN users u ON p.owner_id = u.id WHERE p.owner_id = $1 ORDER BY p.created_at DESC
+        FROM properties p LEFT JOIN users u ON p.owner_id = u.id 
+        WHERE p.owner_id = $1 
+        ORDER BY p.created_at DESC
       `;
       const result = await db.query(query, [ownerId]);
       return result.rows.map(this.formatProperty);
     } catch (err) {
       console.error(`[PropertyService] Error fetching properties by owner ${ownerId}:`, err);
       throw new Error(`Database error while fetching properties by owner.`);
+    }
+  }
+
+  static async delete(propertyId, ownerId, isAdminDeletion = false) {
+    const db = getDB();
+    try {
+      console.log(`[PropertyService] Attempting to delete property ${propertyId} by owner ${ownerId}, admin deletion: ${isAdminDeletion}`);
+      
+      // First, verify the property exists and belongs to the user (unless admin)
+      const checkQuery = `
+        SELECT id, images, status FROM properties WHERE id = $1 ${!isAdminDeletion ? 'AND owner_id = $2' : ''}
+      `;
+      const checkParams = isAdminDeletion ? [propertyId] : [propertyId, ownerId];
+      const checkResult = await db.query(checkQuery, checkParams);
+      
+      if (checkResult.rows.length === 0) {
+        throw new Error('Property not found or you do not have permission to delete it');
+      }
+
+      const property = checkResult.rows[0];
+      
+      if (isAdminDeletion) {
+        // ADMIN DELETION: Soft delete by setting status to 'Rejected'
+        console.log(`[PropertyService] Admin soft-deleting property (status → 'Rejected')`);
+        
+        const updateQuery = `
+          UPDATE properties 
+          SET status = 'Rejected', updated_at = NOW() 
+          WHERE id = $1
+        `;
+        const updateResult = await db.query(updateQuery, [propertyId]);
+
+        if (updateResult.rowCount === 0) {
+          throw new Error('Failed to update property status');
+        }
+
+        // Note: This will trigger the property_status_change_trigger 
+        // which handles reputation penalties and notifications
+        
+        console.log(`[PropertyService] Successfully soft-deleted property ${propertyId} (status = 'Rejected')`);
+        return { success: true, message: 'Property rejected and removed from listings' };
+        
+      } else {
+        // USER DELETION: Hard delete (they own it, can remove completely)
+        console.log(`[PropertyService] User hard-deleting property (complete removal)`);
+        
+        const deleteQuery = `DELETE FROM properties WHERE id = $1 AND owner_id = $2`;
+        const deleteResult = await db.query(deleteQuery, [propertyId, ownerId]);
+
+        if (deleteResult.rowCount === 0) {
+          throw new Error('Failed to delete property');
+        }
+
+        // Note: This will trigger the property_deletion_trigger
+        // which handles notifications (but no penalty for user deletions)
+        
+        console.log(`[PropertyService] Successfully hard-deleted property ${propertyId}`);
+        return { success: true, message: 'Property deleted successfully' };
+      }
+
+    } catch (err) {
+      console.error(`[PropertyService] Error deleting property ${propertyId}:`, err);
+      throw new Error(err.message || 'Database error while deleting property.');
     }
   }
 }

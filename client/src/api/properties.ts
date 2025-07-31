@@ -126,3 +126,12 @@ export const getMyListings = async () => {
     throw new Error(error?.response?.data?.error || error.message);
   }
 };
+
+export const deleteProperty = async (propertyId: string) => {
+  try {
+    const response = await api.delete(`/api/properties/${propertyId}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};

@@ -17,6 +17,8 @@ export interface Message {
   propertyId?: string;
   propertyTitle?: string;
   propertyLocation?: string;
+  propertyPrice?: number;
+  propertyImageUrl?: string;
   isRead: boolean;
   createdAt: string;
 }

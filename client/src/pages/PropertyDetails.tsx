@@ -4,7 +4,7 @@ import {
   MapPin, Star, Bed, Bath, Square, Car, Wind,
   Building, Phone, Mail, MessageCircle, Calendar,
   ArrowLeft, Heart, Share, Flag, ChevronLeft, ChevronRight,
-  Edit, Trash2, X, ZoomIn, Settings
+  Edit, Trash2, X, ZoomIn, Settings, Home
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +44,7 @@ export function PropertyDetails() {
   const [imageModalOpen, setImageModalOpen] = useState(false)
   const [modalImageIndex, setModalImageIndex] = useState(0)
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [propertyNotFound, setPropertyNotFound] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -55,13 +56,20 @@ export function PropertyDetails() {
         const response = await getPropertyById(id) as any
         console.log(`[PropertyDetails] Property response:`, response)
         setProperty(response.property)
-      } catch (error) {
+        setPropertyNotFound(false)
+      } catch (error: any) {
         console.error(`[PropertyDetails] Error fetching property:`, error)
-        toast({
-          title: "Error",
-          description: "Failed to load property details",
-          variant: "destructive",
-        })
+        
+        // Check if it's a 404 (property not found)
+        if (error.message?.includes('not found') || error.status === 404) {
+          setPropertyNotFound(true)
+        } else {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to load property details",
+            variant: "destructive",
+          })
+        }
       } finally {
         setLoading(false)
       }
@@ -358,14 +366,52 @@ export function PropertyDetails() {
     )
   }
 
-  if (!property) {
+  if (!property && !loading) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Property Not Found</h2>
-        <Button onClick={() => navigate('/properties')}>Back to Properties</Button>
+        <div className="max-w-md mx-auto">
+          {propertyNotFound ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="h-10 w-10 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Property No Longer Available</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                This property has been removed by the owner or is no longer available. 
+                It may have been sold, rented out, or deleted from the platform.
+              </p>
+              <div className="space-y-3">
+                <Button onClick={() => navigate('/properties')} className="w-full">
+                  Browse Available Properties
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/messages')}
+                  className="w-full"
+                >
+                  Back to Messages
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                <Home className="h-10 w-10 text-gray-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Property Not Found</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                The property you're looking for doesn't exist or may have been moved.
+              </p>
+              <Button onClick={() => navigate('/properties')}>Back to Properties</Button>
+            </>
+          )}
+        </div>
       </div>
     )
   }
+
+  // TypeScript assertion: property is guaranteed to exist here due to the check above
+  if (!property) return null;
 
   return (
     <div className="space-y-6">

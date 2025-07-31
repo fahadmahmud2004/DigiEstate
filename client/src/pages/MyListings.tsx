@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getMyListings, Property } from "@/api/properties"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { getMyListings, deleteProperty, Property } from "@/api/properties"
 import { useToast } from "@/hooks/useToast"
 
 export function MyListings() {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -40,9 +44,48 @@ export function MyListings() {
         return 'bg-yellow-600 hover:bg-yellow-600'
       case 'Flagged':
         return 'bg-red-600 hover:bg-red-600'
+      case 'Rejected':
+        return 'bg-gray-800 hover:bg-gray-800'  // Dark gray for rejected/deleted by admin
       default:
         return 'bg-gray-600 hover:bg-gray-600'
     }
+  }
+
+  const handleDeleteClick = (property: Property) => {
+    setPropertyToDelete(property)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!propertyToDelete) return
+
+    setDeleteLoading(propertyToDelete._id)
+    try {
+      await deleteProperty(propertyToDelete._id)
+      
+      // Remove the deleted property from the list
+      setProperties(prev => prev.filter(p => p._id !== propertyToDelete._id))
+      
+      toast({
+        title: "Success",
+        description: "Property deleted successfully!",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete property",
+        variant: "destructive",
+      })
+    } finally {
+      setDeleteLoading(null)
+      setDeleteDialogOpen(false)
+      setPropertyToDelete(null)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false)
+    setPropertyToDelete(null)
   }
 
   return (
@@ -152,18 +195,27 @@ export function MyListings() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-lg">
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Listing
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Listing
-                    </DropdownMenuItem>
+                    {property.status !== 'Rejected' && (
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Listing
+                      </DropdownMenuItem>
+                    )}
+                    <Link to={`/properties/${property._id}`}>
+                      <DropdownMenuItem>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                    </Link>
+                    {property.status !== 'Rejected' && (
+                      <DropdownMenuItem 
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => handleDeleteClick(property)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Listing
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -174,6 +226,17 @@ export function MyListings() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
                   {property.description}
                 </p>
+
+                {/* Show note for rejected properties */}
+                {property.status === 'Rejected' && (
+                  <div className="bg-gray-100 border-l-4 border-gray-400 p-3 mb-3 rounded">
+                    <p className="text-sm text-gray-700">
+                      <strong>Property Removed:</strong> This property was removed by an administrator. 
+                      You can still view its details and performance metrics here.
+                    </p>
+                  </div>
+                )}
+
                 <div className="text-2xl font-bold text-blue-600 mb-4">
                   ${property.price.toLocaleString()}
                 </div>
@@ -202,18 +265,44 @@ export function MyListings() {
                       View
                     </Button>
                   </Link>
-                  <Button variant="outline" size="icon">
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <Calendar className="h-4 w-4" />
-                  </Button>
+                  {property.status !== 'Rejected' && (
+                    <>
+                      <Button variant="outline" size="icon">
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon">
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{propertyToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading === propertyToDelete?._id}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLoading === propertyToDelete?._id ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

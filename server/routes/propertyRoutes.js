@@ -93,4 +93,29 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Delete property by ID
+router.delete('/:id', requireUser, async (req, res) => {
+  try {
+    console.log(`[PROPERTY ROUTE] Received DELETE request for property ${req.params.id} by user ${req.user.id}`);
+    
+    // Check if user is admin
+    const isAdminDeletion = req.user.role === 'admin';
+    
+    // For user deletions, ensure they own the property
+    // For admin deletions, allow deletion of any property
+    const result = await PropertyService.delete(req.params.id, req.user.id, isAdminDeletion);
+    
+    res.json({
+      success: true,
+      message: 'Property deleted successfully'
+    });
+  } catch (error) {
+    console.error('[PROPERTY ROUTE] Error deleting property:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete property'
+    });
+  }
+});
+
 module.exports = router;

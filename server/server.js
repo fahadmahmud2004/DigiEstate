@@ -1,7 +1,8 @@
 // Load environment variables
 require("dotenv").config();
 
-console.log('DATABASE_URL:', process.env.DATABASE_URL);  // <-- Add this line here
+console.log('DATABASE_URL:', process.env.DATABASE_URL);
+console.log('DATABASE_URL_AWS:', process.env.DATABASE_URL_AWS);  // Check if AWS URL is loaded
 console.log('JWT_SECRET:', process.env.JWT_SECRET);
 
 const express = require('express');

@@ -5,16 +5,39 @@ let db;
 
 const connectDB = async () => {
   try {
-    db = new Client({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'DigiEstatePERN',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-    });
+    // Try DATABASE_URL_AWS first, then fall back to DATABASE_URL, then local config
+    const connectionStringAWS = process.env.DATABASE_URL_AWS;
+    const connectionStringLocal = process.env.DATABASE_URL;
+    
+    if (connectionStringAWS) {
+      console.log('🌐 Connecting to Supabase database...');
+      console.log('Connection string:', connectionStringAWS);
+      db = new Client({
+        connectionString: connectionStringAWS,
+        ssl: {
+          rejectUnauthorized: false
+        },
+        connectionTimeoutMillis: 10000, // 10 seconds timeout
+        idleTimeoutMillis: 30000, // 30 seconds idle timeout
+      });
+    } else if (connectionStringLocal) {
+      console.log('🏠 Connecting to local database...');
+      db = new Client({
+        connectionString: connectionStringLocal,
+      });
+    } else {
+      console.log('🏠 Connecting to local database with individual config...');
+      db = new Client({
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME || 'DigiEstatePERN',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+      });
+    }
 
     await db.connect();
-    console.log('Connected to PostgreSQL database');
+    console.log('✅ Connected to PostgreSQL database');
 
     // Create tables if they don't exist
     // await createTables();
