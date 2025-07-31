@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { Send, Paperclip, Search, MoreVertical, Plus, X, Upload, FileText, Download } from "lucide-react"
+import { Send, Paperclip, Search, MoreVertical, Plus, X, Upload, FileText, Download, Home, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,6 +11,7 @@ import { getConversations, getMessages, sendMessage, markConversationAsRead, sen
 import { searchUsers, User } from "@/api/users"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
+import { useNavigate } from "react-router-dom"
 
 export function Messages() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -28,6 +29,7 @@ export function Messages() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { user: currentUser } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -257,8 +259,19 @@ export function Messages() {
   const handleStartNewConversation = async (user: User) => {
     try {
       console.log("Starting new conversation with user:", user.name)
+      
+      // Prevent users from messaging themselves
+      if (currentUser?.id === user._id) {
+        toast({
+          title: "Error",
+          description: "You cannot start a conversation with yourself",
+          variant: "destructive",
+        })
+        return
+      }
+      
       // Create a new conversation ID
-      const newConversationId = `conv_current-user_${user._id}`
+      const newConversationId = `conv_${currentUser?.id}_${user._id}`
 
       // Check if conversation already exists
       const existingConv = conversations.find(c => c._id === newConversationId)
@@ -273,12 +286,12 @@ export function Messages() {
       const newConversation: Conversation = {
         _id: newConversationId,
         participants: [
-          { _id: 'current-user', name: 'You' },
+          { _id: currentUser?.id || '', name: currentUser?.name || 'You' },
           { _id: user._id, name: user.name, avatar: user.avatar }
         ],
         lastMessage: {
           _id: 'temp',
-          sender: { _id: 'current-user', name: 'You' },
+          sender: { _id: currentUser?.id || '', name: currentUser?.name || 'You' },
           receiver: { _id: user._id, name: user.name },
           content: 'Start a conversation...',
           isRead: true,
@@ -453,7 +466,7 @@ export function Messages() {
               ) : (
                 <div className="p-2">
                   {conversations.map((conversation) => {
-                    const otherParticipant = conversation.participants.find(p => p._id !== 'current-user')
+                    const otherParticipant = conversation.participants.find(p => p._id !== currentUser?.id)
                     return (
                       <div
                         key={conversation._id}
@@ -509,14 +522,14 @@ export function Messages() {
               <div className="p-4 border-b flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={selectedConv.participants.find(p => p._id !== 'current-user')?.avatar} />
+                    <AvatarImage src={selectedConv.participants.find(p => p._id !== currentUser?.id)?.avatar} />
                     <AvatarFallback className="bg-blue-600 text-white">
-                      {selectedConv.participants.find(p => p._id !== 'current-user')?.name.charAt(0)}
+                      {selectedConv.participants.find(p => p._id !== currentUser?.id)?.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {selectedConv.participants.find(p => p._id !== 'current-user')?.name}
+                      {selectedConv.participants.find(p => p._id !== currentUser?.id)?.name}
                     </h3>
                     {selectedConv.property && (
                       <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -544,16 +557,50 @@ export function Messages() {
                       <div
                         key={message._id}
                         className={`flex ${
-                          message.sender._id === 'current-user' ? 'justify-end' : 'justify-start'
+                          message.sender._id === currentUser?.id ? 'justify-end' : 'justify-start'
                         }`}
                       >
                         <div
                           className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                            message.sender._id === 'current-user'
+                            message.sender._id === currentUser?.id
                               ? 'bg-blue-600 text-white'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                           }`}
                         >
+                          {/* Property Context - Show if message has property context */}
+                          {message.propertyId && (
+                            <div 
+                              className={`mb-2 p-2 rounded-lg border cursor-pointer transition-colors hover:bg-opacity-80 ${
+                                message.sender._id === currentUser?.id
+                                  ? 'bg-blue-500/20 border-blue-400/30 hover:bg-blue-500/30'
+                                  : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600'
+                              }`}
+                              onClick={() => navigate(`/properties/${message.propertyId}`)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Home className="h-4 w-4 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium truncate">
+                                      {message.propertyTitle || 'Property Discussion'}
+                                    </span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      Property
+                                    </Badge>
+                                  </div>
+                                  {message.propertyLocation && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <MapPin className="h-3 w-3" />
+                                      <span className="text-xs opacity-75 truncate">
+                                        {message.propertyLocation}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
                           <p className="text-sm">{message.content}</p>
                           
                           {/* Message Attachments */}
@@ -567,7 +614,7 @@ export function Messages() {
                                   <div
                                     key={index}
                                     className={`flex items-center gap-2 p-2 rounded border ${
-                                      message.sender._id === 'current-user'
+                                      message.sender._id === currentUser?.id
                                         ? 'bg-blue-500/20 border-blue-400/30'
                                         : 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
                                     }`}
@@ -589,7 +636,7 @@ export function Messages() {
                                           size="sm"
                                           onClick={() => handleDownloadFile(fileName)}
                                           className={`p-1 h-6 w-6 ${
-                                            message.sender._id === 'current-user'
+                                            message.sender._id === currentUser?.id
                                               ? 'hover:bg-blue-500/30 text-blue-100'
                                               : 'hover:bg-gray-300 dark:hover:bg-gray-600'
                                           }`}
@@ -605,7 +652,7 @@ export function Messages() {
                           )}
                           
                           <p className={`text-xs mt-1 ${
-                            message.sender._id === 'current-user' ? 'text-blue-100' : 'text-gray-500'
+                            message.sender._id === currentUser?.id ? 'text-blue-100' : 'text-gray-500'
                           }`}>
                             {new Date(message.createdAt).toLocaleTimeString()}
                           </p>

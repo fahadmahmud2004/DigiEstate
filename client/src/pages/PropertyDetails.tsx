@@ -4,7 +4,7 @@ import {
   MapPin, Star, Bed, Bath, Square, Car, Wind,
   Building, Phone, Mail, MessageCircle, Calendar,
   ArrowLeft, Heart, Share, Flag, ChevronLeft, ChevronRight,
-  Edit, Trash2, X, ZoomIn
+  Edit, Trash2, X, ZoomIn, Settings
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { getPropertyById, Property } from "@/api/properties"
 import { createBooking } from "@/api/bookings"
 import { getPropertyReviews, createPropertyReview, updateReview, deleteReview, Review, ReviewsResponse } from "@/api/reviews"
+import { sendMessage } from "@/api/messages"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -42,6 +43,7 @@ export function PropertyDetails() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [imageModalOpen, setImageModalOpen] = useState(false)
   const [modalImageIndex, setModalImageIndex] = useState(0)
+  const [sendingMessage, setSendingMessage] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -205,6 +207,62 @@ export function PropertyDetails() {
     setEditingReview(review)
     setReviewData({ rating: review.rating, comment: review.comment })
     setReviewDialogOpen(true)
+  }
+
+  const handleSendMessage = async () => {
+    if (!property || !user) {
+      toast({
+        title: "Error",
+        description: "Please log in to send a message",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Prevent users from messaging themselves
+    if (user.id === property.owner._id) {
+      toast({
+        title: "Error",
+        description: "You cannot send a message to yourself",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSendingMessage(true)
+    try {
+      console.log(`[PropertyDetails] Sending message to property owner: ${property.owner._id}`)
+      
+      await sendMessage({
+        receiverId: property.owner._id,
+        content: `Hi! I'm interested in your property: ${property.title}`,
+        propertyId: property._id
+      })
+
+      toast({
+        title: "Success",
+        description: "Message sent successfully! Redirecting to messages..."
+      })
+
+      // Redirect to messages page after a short delay
+      setTimeout(() => {
+        navigate('/messages')
+      }, 1500)
+
+    } catch (error: any) {
+      console.error(`[PropertyDetails] Error sending message:`, error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      })
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  const handleManageProperty = () => {
+    navigate('/my-listings')
   }
 
   const nextImage = () => {
@@ -654,9 +712,18 @@ export function PropertyDetails() {
                   <Mail className="h-4 w-4 mr-2" />
                   {property.owner.email}
                 </Button>
-                <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Button 
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  onClick={handleSendMessage}
+                  disabled={sendingMessage || !user || (user && user.id === property.owner._id)}
+                >
                   <MessageCircle className="h-4 w-4 mr-2" />
-                  Send Message
+                  {sendingMessage 
+                    ? "Sending..." 
+                    : (user && user.id === property.owner._id)
+                    ? "Your Property"
+                    : "Send Message"
+                  }
                 </Button>
               </div>
             </CardContent>
@@ -665,62 +732,81 @@ export function PropertyDetails() {
           {/* Booking */}
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Book Viewing</CardTitle>
-              <CardDescription>Schedule a visit to this property</CardDescription>
+              <CardTitle>
+                {user && user.id === property.owner._id ? 'Property Management' : 'Book Viewing'}
+              </CardTitle>
+              <CardDescription>
+                {user && user.id === property.owner._id 
+                  ? 'Manage your property listing' 
+                  : 'Schedule a visit to this property'
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Book Now
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-white">
-                  <DialogHeader>
-                    <DialogTitle>Book Property Viewing</DialogTitle>
-                    <DialogDescription>
-                      Fill in your preferred date and time for viewing this property.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="date">Preferred Date</Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        value={bookingData.preferredDate}
-                        onChange={(e) => setBookingData(prev => ({ ...prev, preferredDate: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="time">Preferred Time</Label>
-                      <Input
-                        id="time"
-                        type="time"
-                        value={bookingData.preferredTime}
-                        onChange={(e) => setBookingData(prev => ({ ...prev, preferredTime: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="message">Message (Optional)</Label>
-                      <Textarea
-                        id="message"
-                        placeholder="Any specific requirements or questions..."
-                        value={bookingData.message}
-                        onChange={(e) => setBookingData(prev => ({ ...prev, message: e.target.value }))}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleBooking}
-                      disabled={bookingLoading}
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
-                    >
-                      {bookingLoading ? "Sending..." : "Send Booking Request"}
+              {user && user.id === property.owner._id ? (
+                // Owner view - Manage Property
+                <Button 
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  onClick={handleManageProperty}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Manage Your Property
+                </Button>
+              ) : (
+                // Non-owner view - Book Viewing
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Book Now
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white">
+                    <DialogHeader>
+                      <DialogTitle>Book Property Viewing</DialogTitle>
+                      <DialogDescription>
+                        Fill in your preferred date and time for viewing this property.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="date">Preferred Date</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={bookingData.preferredDate}
+                          onChange={(e) => setBookingData(prev => ({ ...prev, preferredDate: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="time">Preferred Time</Label>
+                        <Input
+                          id="time"
+                          type="time"
+                          value={bookingData.preferredTime}
+                          onChange={(e) => setBookingData(prev => ({ ...prev, preferredTime: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="message">Message (Optional)</Label>
+                        <Textarea
+                          id="message"
+                          placeholder="Any specific requirements or questions..."
+                          value={bookingData.message}
+                          onChange={(e) => setBookingData(prev => ({ ...prev, message: e.target.value }))}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleBooking}
+                        disabled={bookingLoading}
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                      >
+                        {bookingLoading ? "Sending..." : "Send Booking Request"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </CardContent>
           </Card>
 

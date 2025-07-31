@@ -139,10 +139,12 @@ class MessageService {
       const query = `
         SELECT m.*, 
                s.name as sender_name, s.avatar as sender_avatar,
-               r.name as receiver_name, r.avatar as receiver_avatar
+               r.name as receiver_name, r.avatar as receiver_avatar,
+               p.title as property_title, p.location as property_location
         FROM messages m
         LEFT JOIN users s ON m.sender_id = s.id
         LEFT JOIN users r ON m.receiver_id = r.id
+        LEFT JOIN properties p ON m.property_id = p.id
         WHERE m.conversation_id = $1 AND (m.sender_id = $2 OR m.receiver_id = $2)
         ORDER BY m.created_at ASC
       `;
@@ -164,6 +166,8 @@ class MessageService {
         isRead: row.is_read,
         conversationId: row.conversation_id,
         propertyId: row.property_id,
+        propertyTitle: row.property_title,
+        propertyLocation: row.property_location,
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));

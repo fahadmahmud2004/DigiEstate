@@ -14,6 +14,9 @@ export interface Message {
   };
   content: string;
   attachments?: string[];
+  propertyId?: string;
+  propertyTitle?: string;
+  propertyLocation?: string;
   isRead: boolean;
   createdAt: string;
 }
