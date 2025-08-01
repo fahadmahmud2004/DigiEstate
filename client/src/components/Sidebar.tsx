@@ -15,7 +15,8 @@ import {
   Users,
   Gavel,
   FileText,
-  Activity
+  Activity,
+  AlertTriangle
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -26,6 +27,9 @@ const navigation = [
   { name: "My Listings", href: "/my-listings", icon: ListChecks },
   { name: "My Bookings", href: "/my-bookings", icon: Calendar },
   { name: "Messages", href: "/messages", icon: MessageSquare },
+  { name: "My Complaints", href: "/my-complaints", icon: FileText },
+  { name: "Property Complaints", href: "/property-complaints", icon: AlertTriangle },
+  // { name: "My Appeals", href: "/my-appeals", icon: AlertTriangle },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Preferences", href: "/notification-preferences", icon: Settings },
 ]

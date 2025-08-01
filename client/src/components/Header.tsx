@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom"
 import { Badge } from "./ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { Link, useLocation } from "react-router-dom"
+import { getAvatarUrl } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,9 +70,9 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={"/placeholder-avatar.jpg"} alt="User" />
+                  <AvatarImage src={getAvatarUrl(user?.avatar)} alt="User" />
                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                    <User className="h-4 w-4" />
+                    {user?.name?.charAt(0)?.toUpperCase() || <User className="h-4 w-4" />}
                   </AvatarFallback>
                 </Avatar>
               </Button>

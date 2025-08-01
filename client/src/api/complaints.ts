@@ -11,6 +11,7 @@ export interface Complaint {
     _id: string;
     name: string;
     email: string;
+    ownerId?: string;
   };
   targetType: 'user' | 'property';
   type: 'Fraudulent Listing' | 'Inappropriate Behavior' | 'Payment Issues' | 'Other';
@@ -71,6 +72,32 @@ export const createComplaint = async (complaintData: {
 }) => {
   try {
     const response = await api.post('/api/complaints', complaintData);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
+
+// Description: Get complaints for property owner
+// Endpoint: GET /api/complaints/owner
+// Request: {}
+// Response: { success: boolean, complaints: Complaint[] }
+export const getOwnerComplaints = async () => {
+  try {
+    const response = await api.get('/api/complaints/owner');
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.error || error.message);
+  }
+};
+
+// Description: Get complaints made by the current user
+// Endpoint: GET /api/complaints/my-complaints
+// Request: {}
+// Response: { success: boolean, complaints: Complaint[] }
+export const getMyComplaints = async () => {
+  try {
+    const response = await api.get('/api/complaints/my-complaints');
     return response.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.error || error.message);

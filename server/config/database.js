@@ -40,7 +40,7 @@ const connectDB = async () => {
     console.log('✅ Connected to PostgreSQL database');
 
     // Create tables if they don't exist
-    // await createTables();
+    await createTables();
     await createAdminUser();
 
   } catch (error) {
@@ -91,7 +91,7 @@ const createTables = async () => {
     // Properties table with all required columns
     await db.query(`
       CREATE TABLE IF NOT EXISTS properties (
-        id VARCHAR(255) PRIMARY KEY,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         title VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
         type VARCHAR(50) NOT NULL,
@@ -222,9 +222,9 @@ const createTables = async () => {
     // Complaints table
     await db.query(`
       CREATE TABLE IF NOT EXISTS complaints (
-        id VARCHAR(255) PRIMARY KEY,
-        complainant VARCHAR(255) NOT NULL,
-        target VARCHAR(255) NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        complainant_id UUID NOT NULL,
+        target_id UUID NOT NULL,
         target_type VARCHAR(50) NOT NULL CHECK (target_type IN ('user', 'property')),
         type VARCHAR(100) NOT NULL CHECK (type IN ('Fraudulent Listing', 'Inappropriate Behavior', 'Payment Issues', 'Other')),
         description TEXT NOT NULL,
@@ -232,39 +232,100 @@ const createTables = async () => {
         status VARCHAR(50) DEFAULT 'open' CHECK (status IN ('open', 'in-progress', 'resolved', 'dismissed')),
         resolution TEXT DEFAULT '',
         admin_notes TEXT DEFAULT '',
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
     console.log('Complaints table created/verified');
 
+    // Appeals table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS appeals (
+        id SERIAL PRIMARY KEY,
+        complaint_id UUID NOT NULL,
+        property_id UUID NOT NULL,
+        property_owner_id UUID NOT NULL,
+        complainant_id UUID NOT NULL,
+        message TEXT NOT NULL,
+        evidence_photos TEXT[] DEFAULT '{}',
+        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        admin_response TEXT DEFAULT '',
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('Appeals table created/verified');
+
+    // Migrate existing appeals table if needed
+    try {
+      // Check if property_id column is VARCHAR and needs to be migrated to UUID
+      const columnCheck = await db.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'appeals' AND column_name = 'property_id'
+      `);
+      
+      if (columnCheck.rows.length > 0 && columnCheck.rows[0].data_type === 'character varying') {
+        console.log('Migrating appeals.property_id from VARCHAR to UUID...');
+        
+        // Create a temporary column
+        await db.query(`ALTER TABLE appeals ADD COLUMN property_id_new UUID`);
+        
+        // Copy data with conversion (this will work if the VARCHAR contains valid UUIDs)
+        await db.query(`UPDATE appeals SET property_id_new = property_id::uuid`);
+        
+        // Drop old column and rename new one
+        await db.query(`ALTER TABLE appeals DROP COLUMN property_id`);
+        await db.query(`ALTER TABLE appeals RENAME COLUMN property_id_new TO property_id`);
+        
+        console.log('Successfully migrated appeals.property_id to UUID');
+      }
+    } catch (migrationError) {
+      console.log('Migration error or column already correct:', migrationError.message);
+    }
+
     // Create indexes for better performance
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id ON notification_preferences(user_id);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints(created_at DESC);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_properties_owner_id ON properties(owner_id);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_messages_receiver_id ON messages(receiver_id);
-    `);
+    try {
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id ON notification_preferences(user_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints(created_at DESC);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_appeals_property_owner_id ON appeals(property_owner_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_appeals_status ON appeals(status);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_appeals_created_at ON appeals(created_at DESC);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_properties_owner_id ON properties(owner_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_receiver_id ON messages(receiver_id);
+      `);
+    } catch (indexError) {
+      console.log('Some indexes already exist or error creating indexes:', indexError.message);
+    }
 
     console.log('Database tables and indexes created successfully');
   } catch (error) {

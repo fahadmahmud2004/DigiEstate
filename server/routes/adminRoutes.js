@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const AdminService = require('../services/adminService.js');
 const ComplaintService = require('../services/complaintService.js');
+const AppealService = require('../services/appealService.js');
 const { requireAdmin } = require('./middleware/adminAuth.js');
 const { getDB } = require('../config/database.js');
 
@@ -438,6 +439,147 @@ router.get('/fraud-alerts', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('[ADMIN] Error fetching fraud alerts:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get all appeals for admin
+router.get('/appeals', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    console.log(`[ADMIN] GET /api/admin/appeals - page: ${page}, limit: ${limit}`);
+    
+    const result = await AppealService.getAll(page, limit);
+    
+    // Format appeals for frontend
+    const formattedAppeals = result.appeals.map(appeal => ({
+      _id: appeal.id,
+      complaint_id: appeal.complaint_id,
+      property_id: appeal.property_id,
+      property_owner_id: appeal.property_owner_id,
+      complainant_id: appeal.complainant_id,
+      message: appeal.message,
+      evidence_photos: appeal.evidence_photos || [],
+      status: appeal.status,
+      admin_response: appeal.admin_response || '',
+      created_at: appeal.created_at,
+      updated_at: appeal.updated_at,
+      resolved_at: appeal.resolved_at,
+      complaint_description: appeal.complaint_description,
+      complaint_type: appeal.complaint_type,
+      complaint_status: appeal.complaint_status,
+      property_title: appeal.property_title,
+      complainant_name: appeal.complainant_name,
+      owner_name: appeal.owner_name
+    }));
+    
+    console.log(`[ADMIN] Retrieved ${formattedAppeals.length} appeals successfully`);
+    
+    res.json({
+      success: true,
+      appeals: formattedAppeals,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching appeals:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Update appeal status
+router.put('/appeals/:appealId/status', requireAdmin, async (req, res) => {
+  try {
+    const { appealId } = req.params;
+    const { status, admin_response } = req.body;
+    
+    console.log(`[ADMIN] PUT /api/admin/appeals/${appealId}/status - status: ${status}`);
+    
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+    
+    const updatedAppeal = await AppealService.updateStatus(appealId, status, admin_response);
+    
+    const formattedAppeal = {
+      _id: updatedAppeal.id,
+      complaint_id: updatedAppeal.complaint_id,
+      property_id: updatedAppeal.property_id,
+      property_owner_id: updatedAppeal.property_owner_id,
+      complainant_id: updatedAppeal.complainant_id,
+      message: updatedAppeal.message,
+      evidence_photos: updatedAppeal.evidence_photos || [],
+      status: updatedAppeal.status,
+      admin_response: updatedAppeal.admin_response || '',
+      created_at: updatedAppeal.created_at,
+      updated_at: updatedAppeal.updated_at,
+      resolved_at: updatedAppeal.resolved_at
+    };
+    
+    console.log(`[ADMIN] Appeal ${appealId} status updated to ${status} successfully`);
+    
+    res.json({
+      success: true,
+      appeal: formattedAppeal,
+      message: `Appeal status updated to ${status} successfully`
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error updating appeal status:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get specific appeal details
+router.get('/appeals/:appealId', requireAdmin, async (req, res) => {
+  try {
+    const { appealId } = req.params;
+    
+    console.log(`[ADMIN] GET /api/admin/appeals/${appealId} - Fetching appeal details`);
+    
+    const appeal = await AppealService.getById(appealId);
+    
+    const formattedAppeal = {
+      _id: appeal.id,
+      complaint_id: appeal.complaint_id,
+      property_id: appeal.property_id,
+      property_owner_id: appeal.property_owner_id,
+      complainant_id: appeal.complainant_id,
+      message: appeal.message,
+      evidence_photos: appeal.evidence_photos || [],
+      status: appeal.status,
+      admin_response: appeal.admin_response || '',
+      created_at: appeal.created_at,
+      updated_at: appeal.updated_at,
+      resolved_at: appeal.resolved_at,
+      complaint_description: appeal.complaint_description,
+      complaint_type: appeal.complaint_type,
+      complaint_status: appeal.complaint_status,
+      property_title: appeal.property_title,
+      complainant_name: appeal.complainant_name,
+      owner_name: appeal.owner_name
+    };
+    
+    res.json({
+      success: true,
+      appeal: formattedAppeal
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching appeal details:', error.message);
     res.status(500).json({
       success: false,
       error: error.message

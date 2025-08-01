@@ -69,24 +69,20 @@ router.get('/my-complaints', requireUser, async (req, res) => {
 
     console.log(`[COMPLAINT] GET /api/complaints/my-complaints - user: ${req.user.id}`);
 
-    const result = await ComplaintService.getAll(page, limit);
-    
-    // Filter complaints by current user
-    const userComplaints = result.complaints.filter(
-      complaint => complaint.complainant === req.user.id.toString()
-    );
+    const result = await ComplaintService.getByComplainant(req.user.id.toString(), page, limit);
 
-    const formattedComplaints = userComplaints.map(complaint => ({
+    const formattedComplaints = result.complaints.map(complaint => ({
       _id: complaint.id,
       complainant: {
-        _id: complaint.complainant,
+        _id: complaint.complainant_id,
         name: complaint.complainant_name || 'You',
         email: complaint.complainant_email || ''
       },
       target: {
-        _id: complaint.target,
+        _id: complaint.target_id,
         name: complaint.target_name || complaint.property_title || 'Unknown',
-        email: complaint.target_email || ''
+        email: complaint.target_email || complaint.property_owner_email || '',
+        ownerId: complaint.property_owner_id || complaint.target_id
       },
       targetType: complaint.target_type,
       type: complaint.type,
@@ -104,12 +100,65 @@ router.get('/my-complaints', requireUser, async (req, res) => {
     res.json({
       success: true,
       complaints: formattedComplaints,
-      total: formattedComplaints.length,
-      page,
-      totalPages: Math.ceil(formattedComplaints.length / limit)
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages
     });
   } catch (error) {
     console.error('[COMPLAINT] Error fetching user complaints:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get complaints for property owner
+router.get('/owner', requireUser, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    console.log(`[COMPLAINT] GET /api/complaints/owner - user: ${req.user.id}`);
+
+    const result = await ComplaintService.getByPropertyOwner(req.user.id.toString(), page, limit);
+
+    const formattedComplaints = result.complaints.map(complaint => ({
+      _id: complaint.id,
+      complainant: {
+        _id: complaint.complainant_id,
+        name: complaint.complainant_name || 'Unknown',
+        email: complaint.complainant_email || ''
+      },
+      target: {
+        _id: complaint.target_id,
+        name: complaint.property_title || 'Unknown Property',
+        email: complaint.property_owner_email || ''
+      },
+      targetType: complaint.target_type,
+      type: complaint.type,
+      description: complaint.description,
+      evidence: complaint.evidence || [],
+      status: complaint.status,
+      resolution: complaint.resolution || '',
+      adminNotes: complaint.admin_notes || '',
+      createdAt: complaint.created_at,
+      updatedAt: complaint.updated_at,
+      property_id: complaint.target_id,
+      property_title: complaint.property_title
+    }));
+
+    console.log(`[COMPLAINT] Retrieved ${formattedComplaints.length} complaints for property owner ${req.user.id}`);
+
+    res.json({
+      success: true,
+      complaints: formattedComplaints,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages
+    });
+  } catch (error) {
+    console.error('[COMPLAINT] Error fetching owner complaints:', error.message);
     res.status(500).json({
       success: false,
       error: error.message

@@ -12,6 +12,9 @@ import { PropertyDetails } from "./pages/PropertyDetails"
 import { CreateListing } from "./pages/CreateListing"
 import { MyListings } from "./pages/MyListings"
 import { MyBookings } from "./pages/MyBookings"
+import { MyComplaints } from "./pages/MyComplaints"
+import { PropertyComplaints } from "./pages/PropertyComplaints"
+import { MyAppeals } from "./pages/MyAppeals"
 import { Messages } from "./pages/Messages"
 import { Profile } from "./pages/Profile"
 import { Notifications } from "./pages/Notifications"
@@ -40,6 +43,9 @@ function App() {
               <Route path="create-listing" element={<CreateListing />} />
               <Route path="my-listings" element={<MyListings />} />
               <Route path="my-bookings" element={<MyBookings />} />
+              <Route path="my-complaints" element={<MyComplaints />} />
+              <Route path="property-complaints" element={<PropertyComplaints />} />
+              <Route path="my-appeals" element={<MyAppeals />} />
               <Route path="messages" element={<Messages />} />
               <Route path="profile" element={<Profile />} />
               <Route path="notifications" element={<Notifications />} />

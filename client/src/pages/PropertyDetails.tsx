@@ -11,14 +11,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getPropertyById, Property } from "@/api/properties"
 import { createBooking } from "@/api/bookings"
 import { getPropertyReviews, createPropertyReview, updateReview, deleteReview, Review, ReviewsResponse } from "@/api/reviews"
 import { sendMessage } from "@/api/messages"
+import { createComplaint } from "@/api/complaints"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -45,6 +47,13 @@ export function PropertyDetails() {
   const [modalImageIndex, setModalImageIndex] = useState(0)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [propertyNotFound, setPropertyNotFound] = useState(false)
+  const [complaintDialogOpen, setComplaintDialogOpen] = useState(false)
+  const [complaintData, setComplaintData] = useState({
+    type: 'Fraudulent Listing' as 'Fraudulent Listing' | 'Inappropriate Behavior' | 'Payment Issues' | 'Other',
+    description: '',
+    evidence: [] as string[]
+  })
+  const [submittingComplaint, setSubmittingComplaint] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -273,6 +282,49 @@ export function PropertyDetails() {
     navigate('/my-listings')
   }
 
+  const handleSubmitComplaint = async () => {
+    if (!property || !user || !complaintData.description.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSubmittingComplaint(true)
+    try {
+      await createComplaint({
+        target: property._id,
+        targetType: 'property',
+        type: complaintData.type,
+        description: complaintData.description,
+        evidence: complaintData.evidence
+      })
+
+      toast({
+        title: "Success",
+        description: "Complaint submitted successfully! Our team will review it.",
+      })
+      
+      setComplaintData({
+        type: 'Fraudulent Listing',
+        description: '',
+        evidence: []
+      })
+      setComplaintDialogOpen(false)
+    } catch (error: any) {
+      console.error('Complaint submission error:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit complaint",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmittingComplaint(false)
+    }
+  }
+
   const nextImage = () => {
     if (property && property.images.length > 1) {
       setCurrentImageIndex((prev) => (prev + 1) % property.images.length)
@@ -428,9 +480,66 @@ export function PropertyDetails() {
           <Button variant="outline" size="icon">
             <Share className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon">
-            <Flag className="h-4 w-4" />
-          </Button>
+          {user && user.id !== property?.owner._id && (
+            <Dialog open={complaintDialogOpen} onOpenChange={setComplaintDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="text-red-600 hover:text-red-700">
+                  <Flag className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-white">
+                <DialogHeader>
+                  <DialogTitle>Report Property</DialogTitle>
+                  <DialogDescription>
+                    Report any issues or concerns about this property listing
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="complaint-type">Issue Type</Label>
+                    <Select 
+                      value={complaintData.type} 
+                      onValueChange={(value: 'Fraudulent Listing' | 'Inappropriate Behavior' | 'Payment Issues' | 'Other') => 
+                        setComplaintData(prev => ({ ...prev, type: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Fraudulent Listing">Fraudulent Listing</SelectItem>
+                        <SelectItem value="Inappropriate Behavior">Inappropriate Behavior</SelectItem>
+                        <SelectItem value="Payment Issues">Payment Issues</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="complaint-description">Description</Label>
+                    <Textarea
+                      id="complaint-description"
+                      placeholder="Please describe the issue in detail..."
+                      value={complaintData.description}
+                      onChange={(e) => setComplaintData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={4}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setComplaintDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSubmitComplaint} 
+                    disabled={submittingComplaint || !complaintData.description.trim()}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {submittingComplaint ? "Submitting..." : "Submit Report"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

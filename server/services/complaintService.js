@@ -46,11 +46,13 @@ class ComplaintService {
         SELECT c.*, 
                u1.name as complainant_name, u1.email as complainant_email,
                u2.name as target_name, u2.email as target_email,
-               p.title as property_title
+               p.title as property_title, p.owner_id as property_owner_id,
+               u3.name as property_owner_name, u3.email as property_owner_email
         FROM complaints c
         LEFT JOIN users u1 ON c.complainant_id = u1.id
         LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
         LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
+        LEFT JOIN users u3 ON p.owner_id = u3.id
         ORDER BY c.created_at DESC 
         LIMIT $1 OFFSET $2
       `, [limit, offset]);
@@ -162,11 +164,13 @@ class ComplaintService {
         SELECT c.*, 
                u1.name as complainant_name, u1.email as complainant_email,
                u2.name as target_name, u2.email as target_email,
-               p.title as property_title
+               p.title as property_title, p.owner_id as property_owner_id,
+               u3.name as property_owner_name, u3.email as property_owner_email
         FROM complaints c
         LEFT JOIN users u1 ON c.complainant_id = u1.id
         LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
         LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
+        LEFT JOIN users u3 ON p.owner_id = u3.id
         WHERE c.id = $1
       `, [id]);
       
@@ -174,6 +178,97 @@ class ComplaintService {
     } catch (err) {
       console.error(`[ComplaintService] Error fetching complaint: ${err.message}`);
       throw new Error(`Database error while fetching complaint: ${err.message}`);
+    }
+  }
+
+  static async getByComplainant(complainantId, page = 1, limit = 10) {
+    try {
+      console.log(`[ComplaintService] Fetching complaints for complainant: ${complainantId}`);
+      const db = getDB();
+      
+      const offset = (page - 1) * limit;
+      
+      // Get total count for this complainant
+      const countResult = await db.query(
+        'SELECT COUNT(*) FROM complaints WHERE complainant_id = $1',
+        [complainantId]
+      );
+      const total = parseInt(countResult.rows[0].count);
+      
+      // Get paginated complaints for this complainant
+      const result = await db.query(`
+        SELECT c.*, 
+               u1.name as complainant_name, u1.email as complainant_email,
+               u2.name as target_name, u2.email as target_email,
+               p.title as property_title, p.owner_id as property_owner_id,
+               u3.name as property_owner_name, u3.email as property_owner_email
+        FROM complaints c
+        LEFT JOIN users u1 ON c.complainant_id = u1.id
+        LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
+        LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
+        LEFT JOIN users u3 ON p.owner_id = u3.id
+        WHERE c.complainant_id = $1
+        ORDER BY c.created_at DESC 
+        LIMIT $2 OFFSET $3
+      `, [complainantId, limit, offset]);
+      
+      console.log(`[ComplaintService] Retrieved ${result.rows.length} complaints for complainant ${complainantId}`);
+      
+      return {
+        complaints: result.rows,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (err) {
+      console.error(`[ComplaintService] Error fetching complaints by complainant: ${err.message}`);
+      throw new Error(`Database error while fetching complaints by complainant: ${err.message}`);
+    }
+  }
+
+  static async getByPropertyOwner(ownerId, page = 1, limit = 10) {
+    try {
+      console.log(`[ComplaintService] Fetching complaints for property owner: ${ownerId}`);
+      const db = getDB();
+      
+      const offset = (page - 1) * limit;
+      
+      // Get total count for this property owner
+      const countResult = await db.query(`
+        SELECT COUNT(*) FROM complaints c
+        LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
+        WHERE p.owner_id = $1
+      `, [ownerId]);
+      const total = parseInt(countResult.rows[0].count);
+      
+      // Get paginated complaints for this property owner
+      const result = await db.query(`
+        SELECT c.*, 
+               u1.name as complainant_name, u1.email as complainant_email,
+               u2.name as target_name, u2.email as target_email,
+               p.title as property_title, p.owner_id as property_owner_id,
+               u3.name as property_owner_name, u3.email as property_owner_email
+        FROM complaints c
+        LEFT JOIN users u1 ON c.complainant_id = u1.id
+        LEFT JOIN users u2 ON c.target_id = u2.id AND c.target_type = 'user'
+        LEFT JOIN properties p ON c.target_id = p.id AND c.target_type = 'property'
+        LEFT JOIN users u3 ON p.owner_id = u3.id
+        WHERE p.owner_id = $1
+        ORDER BY c.created_at DESC 
+        LIMIT $2 OFFSET $3
+      `, [ownerId, limit, offset]);
+      
+      console.log(`[ComplaintService] Retrieved ${result.rows.length} complaints for property owner ${ownerId}`);
+      
+      return {
+        complaints: result.rows,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (err) {
+      console.error(`[ComplaintService] Error fetching complaints by property owner: ${err.message}`);
+      throw new Error(`Database error while fetching complaints by property owner: ${err.message}`);
     }
   }
 }

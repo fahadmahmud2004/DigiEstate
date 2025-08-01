@@ -13,6 +13,7 @@ import { getUserReviews, createUserReview, updateReview, deleteReview, Review, R
 import { getUserProfile, updateUserProfile, changePassword, UserProfile } from "@/api/profile"
 import { useToast } from "@/hooks/useToast"
 import { useAuth } from "@/contexts/AuthContext"
+import { getAvatarUrl } from "@/lib/utils"
 
 export function Profile() {
   const [isEditing, setIsEditing] = useState(false)
@@ -57,7 +58,7 @@ export function Profile() {
         setEditData({
           name: response.user.name || "",
           phone: response.user.phone || "",
-          avatar: response.user.avatar || ""
+          avatar: getAvatarUrl(response.user.avatar)
         })
       } catch (error: any) {
         console.error('Failed to load profile:', error)
@@ -105,6 +106,11 @@ export function Profile() {
 
       const response = await updateUserProfile(formData)
       setProfileData(response.user)
+      // Update editData with the correct avatar URL after save
+      setEditData(prev => ({
+        ...prev,
+        avatar: getAvatarUrl(response.user.avatar)
+      }))
       toast({
         title: "Success",
         description: response.message || "Profile updated successfully!",
@@ -124,9 +130,10 @@ export function Profile() {
   }
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setAvatarFile(e.target.files[0])
-      setEditData(prev => ({ ...prev, avatar: URL.createObjectURL(e.target.files[0]) }))
+    const files = e.target.files
+    if (files && files[0]) {
+      setAvatarFile(files[0])
+      setEditData(prev => ({ ...prev, avatar: URL.createObjectURL(files[0]) }))
     }
   }
 
@@ -189,13 +196,13 @@ export function Profile() {
     setReviewLoading(true)
     try {
       if (editingReview) {
-        await updateReview(editingReview._id, reviewData.rating, reviewData.comment)
+        await updateReview(editingReview._id, { rating: reviewData.rating, comment: reviewData.comment })
         toast({
           title: "Success",
           description: "Review updated successfully!",
         })
       } else {
-        await createUserReview(profileData!._id, reviewData.rating, reviewData.comment)
+        await createUserReview(profileData!._id, { rating: reviewData.rating, comment: reviewData.comment })
         toast({
           title: "Success",
           description: "Review submitted successfully!",
